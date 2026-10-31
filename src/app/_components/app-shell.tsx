@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { LanguageContext } from "~/app/_components/language-context";
@@ -63,9 +63,12 @@ function NavigationIcon({ name }: { name: string }) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [light, setLight] = useState(false);
   const [romanian, setRomanian] = useState(false);
   const [pilotName, setPilotName] = useState("");
+  const [demoEmail, setDemoEmail] = useState("");
+  const [entryChecked, setEntryChecked] = useState(false);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("aerio.theme") === "light";
@@ -79,17 +82,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       try {
         const profile = JSON.parse(
           localStorage.getItem("aerio.profile") ?? "{}",
-        ) as { name?: string };
-        setPilotName(profile.name?.trim() ?? "");
+        ) as { name?: string; firstName?: string; lastName?: string };
+        const fullName = [profile.firstName, profile.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+        setPilotName(
+          fullName.length > 0 ? fullName : (profile.name?.trim() ?? ""),
+        );
       } catch (error) {
         console.error("Could not read the local pilot name.", error);
       }
     };
+    const updateSession = () => {
+      try {
+        const session = JSON.parse(
+          localStorage.getItem("aerio.session") ?? "null",
+        ) as { mode?: string; email?: string } | null;
+        setDemoEmail(session?.mode === "demo" ? (session.email ?? "") : "");
+      } catch (error) {
+        console.error("Could not read the local demo session.", error);
+        setDemoEmail("");
+      }
+    };
     updatePilot();
+    updateSession();
     window.addEventListener("aerio:profile-updated", updatePilot);
-    return () =>
+    window.addEventListener("aerio:session-updated", updateSession);
+    return () => {
       window.removeEventListener("aerio:profile-updated", updatePilot);
+      window.removeEventListener("aerio:session-updated", updateSession);
+    };
   }, []);
+
+  useEffect(() => {
+    const storedSession = localStorage.getItem("aerio.session");
+    let hasDemoSession = false;
+    try {
+      const session: unknown = storedSession ? JSON.parse(storedSession) : null;
+      hasDemoSession =
+        typeof session === "object" &&
+        session !== null &&
+        "mode" in session &&
+        session.mode === "demo";
+    } catch (error) {
+      console.error("Could not validate the local demo session.", error);
+    }
+    const hasDemoAccess =
+      localStorage.getItem("aerio.demoAccess") === "true" && hasDemoSession;
+    if (!hasDemoAccess && pathname !== "/login") {
+      router.replace("/login");
+      return;
+    }
+    if (hasDemoAccess && pathname === "/login") {
+      router.replace("/");
+      return;
+    }
+    setEntryChecked(true);
+  }, [pathname, router]);
 
   function toggleTheme() {
     const next = !light;
@@ -105,14 +155,42 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = next ? "ro" : "en";
   }
 
+  function signOutDemo() {
+    localStorage.removeItem("aerio.session");
+    localStorage.removeItem("aerio.demoAccess");
+    setDemoEmail("");
+    setEntryChecked(false);
+    window.dispatchEvent(new Event("aerio:session-updated"));
+    router.replace("/login");
+  }
+
   const pageTitles: Record<string, { en: string; ro: string }> = {
     "/": { en: "Today", ro: "Astăzi" },
     "/airspace": { en: "Airspace", ro: "Spațiu aerian" },
     "/request": { en: "Flight request", ro: "Cerere de zbor" },
     "/profile": { en: "Profile", ro: "Profil" },
     "/learn": { en: "Learn", ro: "Ghid" },
+    "/login": { en: "Sign in", ro: "Autentificare" },
   };
   const title = pageTitles[pathname] ?? { en: "Aerio", ro: "Aerio" };
+
+  if (!entryChecked) {
+    return (
+      <LanguageContext.Provider value={romanian}>
+        <div className="entry-loading" aria-live="polite">
+          Aerio
+        </div>
+      </LanguageContext.Provider>
+    );
+  }
+
+  if (pathname === "/login") {
+    return (
+      <LanguageContext.Provider value={romanian}>
+        <main className="standalone-login">{children}</main>
+      </LanguageContext.Provider>
+    );
+  }
 
   return (
     <LanguageContext.Provider value={romanian}>
@@ -144,6 +222,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className={`nav-link ${pathname === link.href ? "active" : ""}`}
                 href={link.href}
                 key={link.href}
+                aria-label={romanian ? link.ro : link.en}
                 aria-current={pathname === link.href ? "page" : undefined}
               >
                 <NavigationIcon name={link.icon} />
@@ -170,6 +249,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
           </section>
           <div className="sidebar-foot">
+            {demoEmail && (
+              <div className="demo-session-indicator" role="status">
+                <span className="demo-session-dot" aria-hidden="true" />
+                <span>
+                  <strong>{romanian ? "Sesiune demo" : "Demo session"}</strong>
+                  <small>{demoEmail}</small>
+                </span>
+                <button type="button" onClick={signOutDemo}>
+                  {romanian ? "Ieșire" : "Sign out"}
+                </button>
+              </div>
+            )}
             <Link className="profile-link" href="/profile">
               <span className="avatar">
                 {pilotName.trim()

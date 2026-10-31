@@ -154,43 +154,51 @@ export function AirspaceMap() {
       >
         <div className="map-toolbar">
           <div className="map-tools">
-            <button
-              className="button button-primary"
-              type="button"
-              aria-pressed={drawing}
-              onClick={() => {
-                setDrawing(!drawing);
-                setPoints([]);
-              }}
-            >
-              {drawing
-                ? ro
-                  ? "Anulează"
-                  : "Cancel drawing"
-                : area.length >= 3
+            {!drawing ? (
+              <button
+                className="button button-primary"
+                type="button"
+                onClick={() => {
+                  setDrawing(true);
+                  setPoints([]);
+                }}
+              >
+                {area.length >= 3
                   ? ro
                     ? "Redesenează zona"
-                    : "Redraw flight area"
+                    : "Redraw area"
                   : ro
-                    ? "Desenează zona"
-                    : "Draw flight area"}
-            </button>
+                    ? "Începe selectarea zonei"
+                    : "Start drawing area"}
+              </button>
+            ) : (
+              <button
+                className="button button-danger"
+                type="button"
+                onClick={() => {
+                  setDrawing(false);
+                  setPoints([]);
+                }}
+              >
+                {ro ? "Anulează desenarea" : "Cancel drawing"}
+              </button>
+            )}
             <button
               className="button button-quiet"
               type="button"
               disabled={!drawing || points.length === 0}
               onClick={() => setPoints((previous) => previous.slice(0, -1))}
             >
-              {ro ? "Anulează punctul" : "Undo point"}
+              {ro ? "Înapoi un punct" : "Undo last point"}
             </button>
             {drawing && (
               <button
-                className="button button-quiet"
+                className="button button-success"
                 type="button"
                 disabled={points.length < 3}
                 onClick={finishArea}
               >
-                {ro ? "Închide poligonul" : "Close polygon"}
+                {ro ? "Salvează poligonul" : "Save polygon"}
               </button>
             )}
             {!drawing && area.length >= 3 && (
@@ -199,14 +207,14 @@ export function AirspaceMap() {
                 type="button"
                 onClick={clearArea}
               >
-                {ro ? "Șterge" : "Clear"}
+                {ro ? "Șterge zona" : "Clear area"}
               </button>
             )}
             <span className="draw-status" aria-live="polite">
               {drawing
                 ? ro
-                  ? `${points.length} puncte · adaugă cel puțin 3`
-                  : `${points.length} points · add at least 3`
+                  ? `${points.length} puncte · apasă pe hartă pentru a continua`
+                  : `${points.length} points · click the map to continue`
                 : area.length >= 3
                   ? ro
                     ? "Zona este salvată. Continuă cu cererea de zbor."
@@ -314,10 +322,22 @@ export function AirspaceMap() {
               }}
             />
           )}
-          {area.length >= 3 && (
+          {area.length >= 3 && !drawing && (
             <Polygon
               positions={area}
               pathOptions={{ color: "#27c69a", fillOpacity: 0.14, weight: 3 }}
+            />
+          )}
+          {drawing && points.length >= 3 && (
+            <Polygon
+              positions={points}
+              pathOptions={{
+                color: "#36d8a3",
+                fillColor: "#36d8a3",
+                fillOpacity: 0.24,
+                weight: 3,
+                dashArray: "8 6",
+              }}
             />
           )}
           {points.length > 1 && (
@@ -384,13 +404,17 @@ export function AirspaceMap() {
           </h2>
         </div>
         <p className="muted">
-          {area.length >= 3
+          {drawing && points.length >= 3
             ? ro
-              ? `${area.length} puncte salvate pe acest dispozitiv. Folosește zona în cererea de zbor.`
-              : `${area.length} boundary points saved on this device. Use this area in your flight request.`
-            : ro
-              ? "Desenează un poligon pe hartă folosind cel puțin trei puncte, apoi închide forma."
-              : "Draw a polygon on the map by placing at least three points and closing the shape."}
+              ? `Previzualizare: poligonul cu ${points.length} puncte se actualizează pe măsură ce selectezi harta. Salvează-l pentru a-l folosi la cerere.`
+              : `Preview: the ${points.length}-point polygon updates as you select the map. Save it to use in your request.`
+            : area.length >= 3
+              ? ro
+                ? `${area.length} puncte salvate pe acest dispozitiv. Folosește zona în cererea de zbor.`
+                : `${area.length} boundary points saved on this device. Use this area in your flight request.`
+              : ro
+                ? "Desenează un poligon pe hartă folosind cel puțin trei puncte, apoi închide forma."
+                : "Draw a polygon on the map by placing at least three points and closing the shape."}
         </p>
         {area.length >= 3 && (
           <button

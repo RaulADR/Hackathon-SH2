@@ -9,7 +9,9 @@ import type {
 import { useEffect, useMemo, useState } from "react";
 
 import { useRomanian } from "~/app/_components/language-context";
+import { DroneIcon } from "~/app/_components/drone-icon";
 import { extractEmailAddresses } from "~/lib/contacts";
+import { normalizeDrones, type PilotDrone } from "~/lib/drone";
 import {
   areasOverlap,
   geoJsonRingToLatLng,
@@ -36,6 +38,7 @@ type LocalPlan = {
   email: string;
   phone: string;
   operatorId: string;
+  location: string;
   registration: string;
   insuranceUntil: string;
   contacts: string[];
@@ -43,16 +46,26 @@ type LocalPlan = {
 };
 type PilotProfile = {
   name?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
   phone?: string;
   operatorId?: string;
+  location?: string;
   registration?: string;
   insuranceUntil?: string;
-  drones?: string[];
+  drones?: PilotDrone[] | string[];
 };
 const PLANS_KEY = "aerio.localPlans";
 const AREA_KEY = "aerio.flightArea";
 const APPROVED_KEY = "aerio.approvedPlans";
+
+function pilotFullName(profile: PilotProfile): string {
+  const fullName = [profile.firstName, profile.lastName]
+    .filter(Boolean)
+    .join(" ");
+  return fullName.length > 0 ? fullName : (profile.name ?? "");
+}
 
 function polygonRings(
   feature: ZoneCollection["features"][number],
@@ -93,8 +106,8 @@ function downloadPackage(plan: LocalPlan, romanian: boolean) {
     `Email: ${plan.email || (romanian ? "Necompletat" : "Not provided")}`,
     `${romanian ? "Telefon" : "Phone"}: ${plan.phone || (romanian ? "Necompletat" : "Not provided")}`,
     `${romanian ? "ID operator AACR" : "AACR operator ID"}: ${plan.operatorId || (romanian ? "Necompletat" : "Not provided")}`,
+    `${romanian ? "Localitate / adresă" : "Location / address"}: ${plan.location || (romanian ? "Necompletat" : "Not provided")}`,
     `${romanian ? "Înregistrare dronă" : "Drone registration"}: ${plan.registration || (romanian ? "Necompletat" : "Not provided")}`,
-    `${romanian ? "Asigurare valabilă până la" : "Insurance valid until"}: ${plan.insuranceUntil || (romanian ? "Necompletat" : "Not provided")}`,
     `${romanian ? "Asigurare valabilă până la" : "Insurance valid until"}: ${plan.insuranceUntil || (romanian ? "Necompletat" : "Not provided")}`,
     `${romanian ? "Data" : "Date"}: ${plan.flightDate}`,
     `${romanian ? "Ora propusă" : "Proposed time"}: ${plan.startTime}–${plan.endTime} (${romanian ? "ora României" : "Romania local time"})`,
@@ -157,6 +170,7 @@ function emailDraftUrl(plan: LocalPlan, romanian: boolean) {
     `Email: ${plan.email}`,
     `${romanian ? "Telefon" : "Phone"}: ${plan.phone || (romanian ? "Necompletat" : "Not provided")}`,
     `${romanian ? "ID operator AACR" : "AACR operator ID"}: ${plan.operatorId || (romanian ? "Necompletat" : "Not provided")}`,
+    `${romanian ? "Localitate / adresă" : "Location / address"}: ${plan.location || (romanian ? "Necompletat" : "Not provided")}`,
     `${romanian ? "Înregistrare dronă" : "Drone registration"}: ${plan.registration || (romanian ? "Necompletat" : "Not provided")}`,
     "",
     `${romanian ? "Cu stimă" : "Regards"},`,
@@ -194,10 +208,11 @@ export default function RequestPage() {
         area,
         drone,
         purpose,
-        pilot: profile.name ?? "",
+        pilot: pilotFullName(profile),
         email: profile.email ?? "",
         phone: profile.phone ?? "",
         operatorId: profile.operatorId ?? "",
+        location: profile.location ?? "",
         registration: profile.registration ?? "",
         insuranceUntil: profile.insuranceUntil ?? "",
         contacts,
@@ -221,13 +236,16 @@ export default function RequestPage() {
         ...plan,
         phone: plan.phone ?? "",
         operatorId: plan.operatorId ?? "",
+        location: plan.location ?? "",
         registration: plan.registration ?? "",
         insuranceUntil: plan.insuranceUntil ?? "",
         contacts: extractEmailAddresses((plan.contacts ?? []).join(" ")),
       })),
     );
-    setProfile(readJson<PilotProfile>("aerio.profile", {}));
-    setDrone(readJson<PilotProfile>("aerio.profile", {}).drones?.[0] ?? "");
+    const savedProfile = readJson<PilotProfile>("aerio.profile", {});
+    const savedDrones = normalizeDrones(savedProfile.drones);
+    setProfile({ ...savedProfile, drones: savedDrones });
+    setDrone(savedDrones[0]?.id ?? "");
     setFlightDate(getRomaniaTime().date);
     void fetch("/data/romatsa-uav-zones.json")
       .then(async (response) => {
@@ -285,15 +303,24 @@ export default function RequestPage() {
       (slot) => slot.startTime === startTime,
     );
     if (!selectedSlot) return;
+    const selectedDrone = profileDrones.find((item) => item.id === drone);
+    if (
+      !selectedDrone?.cameraModel.trim() ||
+      !selectedDrone.cameraResolution.trim()
+    )
+      return;
     preparePlan.mutate({
       flightDate,
       startTime: selectedSlot.startTime,
       endTime: selectedSlot.endTime,
       area,
-      drone,
+      drone: `${selectedDrone.nickname} — ${selectedDrone.model} (${selectedDrone.massGrams} g${selectedDrone.droneClass === "none" ? "" : `, ${selectedDrone.droneClass}`}); ${selectedDrone.cameraModel || (romanian ? "cameră nespecificată" : "camera not set")} · ${selectedDrone.cameraResolution || (romanian ? "rezoluție nespecificată" : "resolution not set")}`,
       purpose,
     });
   }
+
+  const profileDrones = normalizeDrones(profile.drones);
+  const profileName = pilotFullName(profile);
 
   return (
     <>
@@ -371,20 +398,77 @@ export default function RequestPage() {
                   ))}
                 </select>
               </label>
-              <label className="field">
-                <span>{romanian ? "Dronă" : "Drone"}</span>
-                <input
-                  value={drone}
-                  onChange={(event) => setDrone(event.target.value)}
-                  maxLength={120}
-                  placeholder={
-                    romanian
-                      ? "Model sau nume aeronavă"
-                      : "Model or aircraft name"
-                  }
-                  required
-                />
-              </label>
+              <fieldset className="drone-picker-field">
+                <legend>
+                  {romanian
+                    ? "Alege drona pentru zbor"
+                    : "Choose a drone for this flight"}
+                </legend>
+                {profileDrones.length > 0 ? (
+                  <div className="drone-choice-list">
+                    {profileDrones.map((item) => (
+                      <label
+                        className={`drone-choice ${drone === item.id ? "selected" : ""} ${!item.cameraModel.trim() || !item.cameraResolution.trim() ? "unavailable" : ""}`}
+                        key={item.id}
+                      >
+                        <input
+                          type="radio"
+                          name="selected-drone"
+                          value={item.id}
+                          checked={drone === item.id}
+                          onChange={() => setDrone(item.id)}
+                          disabled={
+                            !item.cameraModel.trim() ||
+                            !item.cameraResolution.trim()
+                          }
+                          required
+                        />
+                        <span className="drone-choice-icon">
+                          <DroneIcon />
+                        </span>
+                        <span className="drone-choice-info">
+                          <strong>{item.nickname}</strong>
+                          <span>
+                            {item.model} · {item.massGrams} g
+                          </span>
+                          <span>
+                            {item.cameraModel && item.cameraResolution
+                              ? `${item.cameraModel} · ${item.cameraResolution}`
+                              : romanian
+                                ? "Configurează camera și rezoluția în profil"
+                                : "Set up camera and resolution in Profile"}
+                          </span>
+                        </span>
+                        <span className="drone-choice-check" aria-hidden="true">
+                          {drone === item.id ? "✓" : ""}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="fleet-picker-empty">
+                    {romanian
+                      ? "Adaugă o dronă în flotă înainte de a planifica zborul."
+                      : "Add a drone to your fleet before planning a flight."}{" "}
+                    <Link href="/profile">
+                      {romanian ? "Gestionează flota →" : "Manage fleet →"}
+                    </Link>
+                  </span>
+                )}
+                {profileDrones.some(
+                  (item) =>
+                    !item.cameraModel.trim() || !item.cameraResolution.trim(),
+                ) && (
+                  <span className="fleet-picker-note">
+                    {romanian
+                      ? "Dronele vechi fără rezoluție nu pot fi folosite până nu completezi detaliile."
+                      : "Older drones without a resolution cannot be selected until their details are completed."}{" "}
+                    <Link href="/profile">
+                      {romanian ? "Editează flota →" : "Edit fleet →"}
+                    </Link>
+                  </span>
+                )}
+              </fieldset>
               <label className="field">
                 <span>{romanian ? "Scop" : "Purpose"}</span>
                 <input
@@ -479,7 +563,12 @@ export default function RequestPage() {
               type="submit"
               disabled={
                 !startTime ||
-                !drone.trim() ||
+                !profileDrones.some(
+                  (item) =>
+                    item.id === drone &&
+                    item.cameraModel.trim() &&
+                    item.cameraResolution.trim(),
+                ) ||
                 !purpose.trim() ||
                 preparePlan.isPending
               }
@@ -538,8 +627,8 @@ export default function RequestPage() {
               {romanian ? "DATELE TALE" : "YOUR DETAILS"}
             </span>
             <h2>
-              {profile.name?.trim()
-                ? profile.name
+              {profileName?.trim()
+                ? profileName
                 : romanian
                   ? "Profilul pilotului nu este completat"
                   : "Pilot profile not set"}
