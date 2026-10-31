@@ -67,7 +67,9 @@ export default function ProfilePage() {
       }
       const parsed = JSON.parse(savedProfile) as Partial<PilotProfile> & {
         name?: string;
+        signatureDataUrl?: string;
       };
+      delete parsed.signatureDataUrl;
       const [legacyFirst = "", ...legacyLast] = (parsed.name ?? "")
         .trim()
         .split(/\s+/);

@@ -1,6 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
+import { useRouter } from "next/navigation";
 import {
   CircleMarker,
   GeoJSON,
@@ -88,6 +89,7 @@ function ringsFor(feature: ZoneFeature): LatLngPoint[][] {
 
 export function AirspaceMap() {
   const ro = useRomanian();
+  const router = useRouter();
   const [drawing, setDrawing] = useState(false);
   const [points, setPoints] = useState<LatLngPoint[]>([]);
   const [area, setArea] = useState<LatLngPoint[]>([]);
@@ -137,6 +139,7 @@ export function AirspaceMap() {
     setPoints([]);
     setDrawing(false);
     localStorage.setItem(AREA_KEY, JSON.stringify(points));
+    router.push("/request");
   }
 
   function clearArea() {
@@ -198,7 +201,7 @@ export function AirspaceMap() {
                 disabled={points.length < 3}
                 onClick={finishArea}
               >
-                {ro ? "Salvează poligonul" : "Save polygon"}
+                {ro ? "Folosește zona și continuă" : "Use this area & continue"}
               </button>
             )}
             {!drawing && area.length >= 3 && (

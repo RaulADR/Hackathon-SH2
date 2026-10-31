@@ -1391,6 +1391,18 @@ html[data-theme="light"] .home-facts {
   padding: 0 9px;
   font-size: 10px;
 }
+.tower-auto-value {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  padding: 0 9px;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 600;
+}
 .field input::placeholder {
   color: var(--muted-faint);
 }
@@ -1430,6 +1442,17 @@ html[data-theme="light"] .home-facts {
 .submit-button {
   justify-self: start;
   margin-top: 16px;
+}
+.request-pdf-action {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.request-pdf-action .button {
+  min-width: min(100%, 240px);
 }
 .request-aside {
   display: grid;
@@ -1484,9 +1507,9 @@ html[data-theme="light"] .home-facts {
   gap: 5px;
 }
 .plan-actions .button {
-  min-height: 29px;
-  padding: 0 8px;
-  font-size: 8px;
+  min-height: 38px;
+  padding: 7px 12px;
+  font-size: 10px;
 }
 .profile-card,
 .drone-section {
@@ -1523,6 +1546,68 @@ html[data-theme="light"] .home-facts {
 .profile-form {
   display: grid;
   gap: 16px;
+}
+.profile-form > .button {
+  justify-self: start;
+  min-width: 190px;
+}
+.signature-pad-section {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface-raised);
+  padding: 14px;
+}
+.signature-pad-heading,
+.signature-pad-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.signature-pad-heading > div {
+  display: grid;
+  gap: 3px;
+}
+.signature-pad-heading strong {
+  color: var(--text);
+  font-size: 12px;
+}
+.signature-pad-heading > div > span,
+.signature-pad-footer > span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.signature-pad-status {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--amber) 14%, var(--surface));
+  padding: 5px 9px;
+  color: var(--amber);
+  font-size: 9px;
+  font-weight: 700;
+}
+.signature-pad-status.signed {
+  background: color-mix(in srgb, var(--green) 14%, var(--surface));
+  color: var(--green);
+}
+.signature-canvas {
+  display: block;
+  width: 100%;
+  height: 132px;
+  border: 1px dashed color-mix(in srgb, var(--blue) 38%, var(--line));
+  border-radius: 10px;
+  background: #fff;
+  cursor: crosshair;
+  touch-action: none;
+}
+.signature-pad-footer .button {
+  min-height: 32px;
+  padding: 6px 9px;
+  font-size: 9px;
 }
 .drone-editor {
   display: grid;
