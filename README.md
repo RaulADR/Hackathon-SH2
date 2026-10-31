@@ -1,6 +1,6 @@
 # Aerio
 
-**Aerio** este o aplicație web de planificare a zborurilor cu drone în România. Reunește o hartă cu zone de referință, un profil local de pilot și flotă, planificarea unui zbor și generarea unui proiect PDF Anexa 1.
+**Aerio** este o aplicație web de planificare a zborurilor cu drone în România. Reunește o hartă cu zone de referință, un profil local de pilot și flotă, planificarea unui zbor și generarea automata a anexelor necesare pentru zbor.
 
 > **Important:** Aerio este un prototip de planificare, nu o aplicație oficială AACR sau ROMATSA. Datele aeronautice incluse nu sunt live. Aplicația nu rezervă spațiu aerian, nu trimite cereri către autorități și nu acordă aprobări. Verifică întotdeauna informațiile și cerințele actuale din surse oficiale înainte de zbor.
 
@@ -45,11 +45,11 @@
 - Folosește poligonul salvat, data, durata, scopul și drona selectată.
 - Afișează intervale candidate între orele 08:00 și 20:00, în pași de 30 de minute, comparând planurile suprapuse salvate în baza de date a instalării curente.
 - Identifică turnul TWR doar când contactele ROMATSA ale zonelor care intersectează poligonul indică fără ambiguitate un singur turn cunoscut.
-- Colectează categoria, modul de operare (VLOS/BVLOS) și altitudinea maximă AGL în ft. Categoria propusă urmează regulile simplificate din interfață: A1 sub 250 g, A3 de la 250 g, iar A2 este disponibilă numai pentru drone C2 din intervalul de masă acceptat de formular.
-- Cere o semnătură desenată cu mouse-ul sau cu degetul pentru fiecare cerere.
+- Colectează automat categoria, modul de operare (VLOS/BVLOS) și altitudinea maximă AGL în ft. Categoria propusă urmează regulile simplificate din interfață: A1 sub 250 g, A3 de la 250 g, iar A2 este disponibilă numai pentru drone C2 din intervalul de masă acceptat de formular.
+- Cere o semnătură digitala fiecare cerere.
 - Poate genera în browser un proiect PDF Anexa 1, precum și un rezumat al cererii și un fișier GeoJSON al poligonului.
 - Poate deschide o ciornă de email către contactele extrase din zonele intersectate.
-- Permite marcarea locală a unei cereri ca trimisă sau aprobarea ei înregistrată. Aceste acțiuni nu trimit emailuri și nu verifică aprobări reale.
+- Permite marcarea locală a unei cereri ca trimisă sau aprobarea ei înregistrată. Aceste acțiuni nu trimit emailuri și nu verifică aprobări reale(demo).
 
 ### Ghid și test de pregătire
 
