@@ -41,8 +41,11 @@ const planInput = z.object({
   purpose: z.string().trim().min(1).max(500),
   contacts: z.array(z.string().email().max(254)).max(100),
   tower: z.string().max(120),
-  flightCategory: z.string().max(20),
-  operationMode: z.string().max(20),
+  flightCategory: z.enum(["A1", "A2", "A3"]),
+  operationMode: z.enum([
+    "Visual Line Of Sight (VLOS)",
+    "Beyond Visual Line Of Sight (BVLOS)",
+  ]),
   maxAltitude: z.string().max(10),
   signatureDataUrl: z
     .string()

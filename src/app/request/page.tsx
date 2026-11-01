@@ -37,6 +37,10 @@ type ZoneCollection = FeatureCollection<
   GeoPolygon | MultiPolygon,
   ZoneProperties
 >;
+type FlightCategory = "A1" | "A2" | "A3";
+type OperationMode =
+  | "Visual Line Of Sight (VLOS)"
+  | "Beyond Visual Line Of Sight (BVLOS)";
 type PilotProfile = {
   name?: string;
   firstName?: string;
@@ -58,7 +62,7 @@ function pilotFullName(profile: PilotProfile): string {
   return fullName.length > 0 ? fullName : (profile.name ?? "");
 }
 
-function defaultFlightCategory(drone?: PilotDrone): string {
+function defaultFlightCategory(drone?: PilotDrone): FlightCategory | "" {
   if (!drone) return "";
   if (drone.massGrams < 250) return "A1";
   if (
@@ -114,8 +118,8 @@ export default function RequestPage() {
   const [startTime, setStartTime] = useState("");
   const [drone, setDrone] = useState("");
   const [purpose, setPurpose] = useState("");
-  const [flightCategory, setFlightCategory] = useState("");
-  const [operationMode, setOperationMode] = useState("");
+  const [flightCategory, setFlightCategory] = useState<FlightCategory | "">("");
+  const [operationMode, setOperationMode] = useState<OperationMode | "">("");
   const [maxAltitude, setMaxAltitude] = useState("");
   const [signatureDataUrl, setSignatureDataUrl] = useState("");
   const [pdfDownloadId, setPdfDownloadId] = useState<string | null>(null);
@@ -386,7 +390,7 @@ export default function RequestPage() {
     selectedDrone.cameraResolution.trim() &&
     selectedDrone.droneClass !== "none",
   );
-  const selectableCategories =
+  const selectableCategories: FlightCategory[] =
     selectedDrone && selectedDrone.massGrams < 250
       ? ["A1"]
       : selectedDrone?.droneClass === "C2" &&
@@ -591,9 +595,12 @@ export default function RequestPage() {
                     </span>
                     <select
                       value={flightCategory}
-                      onChange={(event) =>
-                        setFlightCategory(event.target.value)
-                      }
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (value === "A1" || value === "A2" || value === "A3")
+                          setFlightCategory(value);
+                        else setFlightCategory("");
+                      }}
                       required
                       disabled={!selectedDrone}
                     >
@@ -610,7 +617,15 @@ export default function RequestPage() {
                     </span>
                     <select
                       value={operationMode}
-                      onChange={(event) => setOperationMode(event.target.value)}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (
+                          value === "Visual Line Of Sight (VLOS)" ||
+                          value === "Beyond Visual Line Of Sight (BVLOS)"
+                        )
+                          setOperationMode(value);
+                        else setOperationMode("");
+                      }}
                       required
                     >
                       <option value="">
