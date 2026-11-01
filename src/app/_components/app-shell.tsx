@@ -7,16 +7,22 @@ import { useEffect, useState } from "react";
 import { LanguageContext } from "~/app/_components/language-context";
 
 const links = [
-  { href: "/", en: "Today", ro: "Astăzi", icon: "today" },
-  { href: "/airspace", en: "Airspace", ro: "Spațiu aerian", icon: "map" },
+  { href: "/", en: "Today", ro: "Acasă", icon: "today" },
+  { href: "/airspace", en: "Airspace", ro: "Hartă", icon: "map" },
   {
     href: "/request",
-    en: "Flight request",
-    ro: "Cerere de zbor",
+    en: "Plan flight",
+    ro: "Planifică zbor",
     icon: "request",
   },
-  { href: "/profile", en: "Profile", ro: "Profil", icon: "profile" },
-  { href: "/learn", en: "Learn", ro: "Ghid", icon: "learn" },
+  {
+    href: "/flights",
+    en: "My flights",
+    ro: "Zborurile mele",
+    icon: "flights",
+  },
+  { href: "/profile", en: "My drones", ro: "Dronele mele", icon: "profile" },
+  { href: "/learn", en: "Academy", ro: "Academie", icon: "learn" },
 ];
 
 function NavigationIcon({ name }: { name: string }) {
@@ -53,6 +59,14 @@ function NavigationIcon({ name }: { name: string }) {
       </svg>
     );
   }
+  if (name === "flights") {
+    return (
+      <svg className="ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 4.5h14A1.5 1.5 0 0 1 20.5 6v14H3.5V6A1.5 1.5 0 0 1 5 4.5Z" />
+        <path d="M8 2.5v4m8-4v4M3.5 9.5h17M7.5 13h3m-3 3.5h6" />
+      </svg>
+    );
+  }
   return (
     <svg className="ico" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M4 5.6A2.6 2.6 0 0 1 6.6 3H20v15H6.6A2.6 2.6 0 0 0 4 20.6V5.6Z" />
@@ -72,7 +86,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("aerio.theme") === "light";
-    const savedLanguage = localStorage.getItem("aerio.language") === "ro";
+    const storedLanguage = localStorage.getItem("aerio.language");
+    const savedLanguage = storedLanguage === null || storedLanguage === "ro";
     setLight(savedTheme);
     setRomanian(savedLanguage);
     document.documentElement.dataset.theme = savedTheme ? "light" : "dark";
@@ -130,11 +145,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
     const hasDemoAccess =
       localStorage.getItem("aerio.demoAccess") === "true" && hasDemoSession;
-    if (!hasDemoAccess && pathname !== "/login") {
+    if (!hasDemoAccess && pathname !== "/login" && pathname !== "/signup") {
       router.replace("/login");
       return;
     }
-    if (hasDemoAccess && pathname === "/login") {
+    if (hasDemoAccess && (pathname === "/login" || pathname === "/signup")) {
       router.replace("/");
       return;
     }
@@ -165,12 +180,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const pageTitles: Record<string, { en: string; ro: string }> = {
-    "/": { en: "Today", ro: "Astăzi" },
+    "/": { en: "Dashboard", ro: "Panou de control" },
     "/airspace": { en: "Airspace", ro: "Spațiu aerian" },
     "/request": { en: "Flight request", ro: "Cerere de zbor" },
+    "/flights": { en: "My flights", ro: "Zborurile mele" },
     "/profile": { en: "Profile", ro: "Profil" },
     "/learn": { en: "Learn", ro: "Ghid" },
     "/login": { en: "Sign in", ro: "Autentificare" },
+    "/signup": { en: "Sign up", ro: "Creează cont" },
   };
   const title = pageTitles[pathname] ?? { en: "Aerio", ro: "Aerio" };
 
@@ -184,7 +201,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname === "/signup") {
     return (
       <LanguageContext.Provider value={romanian}>
         <main className="standalone-login">{children}</main>
@@ -194,7 +211,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <LanguageContext.Provider value={romanian}>
-      <div className="app-shell">
+      <div className={`app-shell ${pathname === "/" ? "home-shell" : ""}`}>
+        <div className="flying-drone" aria-hidden="true">
+          <img src="/drone-outline.svg" alt="" />
+        </div>
+        <div className="flying-drone drone-b" aria-hidden="true">
+          <img src="/drone-purple.svg" alt="" />
+        </div>
         <aside
           className="sidebar glass"
           aria-label={romanian ? "Navigare principală" : "Primary navigation"}
@@ -210,50 +233,72 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
             <span className="brand-text">
               <strong>Aerio</strong>
-              <small>Flight desk</small>
+              <small>{romanian ? "Birou de zbor" : "Flight desk"}</small>
             </span>
           </Link>
           <nav
             className="main-nav"
             aria-label={romanian ? "Secțiuni" : "Sections"}
           >
-            {links.map((link) => (
-              <Link
-                className={`nav-link ${pathname === link.href ? "active" : ""}`}
-                href={link.href}
-                key={link.href}
-                aria-label={romanian ? link.ro : link.en}
-                aria-current={pathname === link.href ? "page" : undefined}
-              >
-                <NavigationIcon name={link.icon} />
-                <span>{romanian ? link.ro : link.en}</span>
-              </Link>
-            ))}
+            {links.map((link) => {
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  className={`nav-link ${isActive ? "active" : ""}`}
+                  href={link.href}
+                  key={link.href}
+                  aria-label={romanian ? link.ro : link.en}
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  <NavigationIcon name={link.icon} />
+                  <span>{romanian ? link.ro : link.en}</span>
+                </Link>
+              );
+            })}
           </nav>
           <section className="sidebar-note">
-            <p className="note-kicker">
-              {romanian ? "PLANIFICARE ÎN ROMÂNIA" : "ROMANIA FLIGHT DESK"}
-            </p>
-            <p className="note-weather">
-              {romanian ? "Planificare" : "Planning"}{" "}
-              <span>{romanian ? "locală" : "only"}</span>
-            </p>
-            <div className="note-metrics">
-              <span>{romanian ? "Fără date live" : "No live data"}</span>
-              <span>{romanian ? "Fără autorizare" : "No clearance"}</span>
-            </div>
-            <p className="note-meta">
-              {romanian
-                ? "Verifică sursele oficiale înainte de zbor."
-                : "Check official sources before flying."}
-            </p>
+            {pathname === "/" ? (
+              <>
+                <p className="note-kicker">
+                  {romanian ? "LOCAȚIA MEA" : "MY LOCATION"}
+                </p>
+                <p className="note-weather">Craiova</p>
+                <div className="note-metrics">
+                  <span>{romanian ? "România" : "Romania"}</span>
+                  <span>{romanian ? "Locație demo" : "Demo location"}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="note-kicker">
+                  {romanian ? "PLANIFICARE ÎN ROMÂNIA" : "ROMANIA FLIGHT DESK"}
+                </p>
+                <p className="note-weather">
+                  {romanian ? "Planificare" : "Planning"}{" "}
+                  <span>{romanian ? "locală" : "only"}</span>
+                </p>
+                <div className="note-metrics">
+                  <span>
+                    {romanian ? "Fără date în timp real" : "No live data"}
+                  </span>
+                  <span>{romanian ? "Fără autorizare" : "No clearance"}</span>
+                </div>
+                <p className="note-meta">
+                  {romanian
+                    ? "Verifică sursele oficiale înainte de zbor."
+                    : "Check official sources before flying."}
+                </p>
+              </>
+            )}
           </section>
           <div className="sidebar-foot">
             {demoEmail && (
               <div className="demo-session-indicator" role="status">
                 <span className="demo-session-dot" aria-hidden="true" />
                 <span>
-                  <strong>{romanian ? "Sesiune demo" : "Demo session"}</strong>
+                  <strong>
+                    {romanian ? "Sesiune demonstrativă" : "Demo session"}
+                  </strong>
                   <small>{demoEmail}</small>
                 </span>
                 <button type="button" onClick={signOutDemo}>

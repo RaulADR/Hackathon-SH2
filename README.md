@@ -23,6 +23,9 @@
 ### Panou principal
 
 - Oferă acces rapid la hartă, planificarea unui zbor, profil și ghid.
+- Afișează zborurile salvate local și statusul lor: pregătit, marcat ca trimis sau aprobare înregistrată local.
+- Bara de sus este transparentă și discretă pe toate paginile aplicației.
+- Include acces la pagina separată „Zborurile mele” imediat după „Planifică zbor” în navigare; acolo sunt listate cererile și statusurile lor.
 - Prezintă pe scurt pașii de planificare și linkuri către surse oficiale.
 
 ### Hartă aeronautică
@@ -61,8 +64,8 @@
 
 - Interfața poate fi afișată în română sau engleză.
 - Tema luminoasă/albă și tema întunecată pot fi schimbate din interfață.
-- Ecranul de autentificare oferă acces la o sesiune demo locală.
-- Formularul email/parolă este doar o interfață demonstrativă. Nu autentifică utilizatori și nu trimite sau salvează parola.
+- Ecranele de autentificare și creare cont oferă acces la o sesiune demo locală.
+- Formularele email/parolă sunt doar interfețe demonstrative. Autentificarea și crearea contului nu sunt active; datele introduse nu sunt trimise sau salvate.
 
 ## Tutorial de utilizare
 
@@ -107,31 +110,31 @@ Versiunile declarate în `package.json` sunt folosite la instalare; lista de mai
 
 ### Dependențe de producție
 
-| Pachet | Rol |
-|---|---|
-| `next` | Framework web, App Router și API routes |
-| `react`, `react-dom` | Interfață și randare React |
-| `@prisma/client` | Acces la baza de date prin Prisma |
-| `@t3-oss/env-nextjs` | Utilitare pentru variabile de mediu Next.js |
-| `@trpc/client`, `@trpc/react-query`, `@trpc/server` | API tRPC și integrarea cu React Query |
-| `@tanstack/react-query` | Cache și gestionarea cererilor asincrone |
-| `zod` | Validarea schemelor de intrare și a datelor |
-| `superjson` | Serializarea datelor folosite de tRPC |
-| `prisma` | Schema, clientul și comenzile pentru baza de date |
-| `leaflet`, `react-leaflet` | Hărți și componente geografice |
-| `pdf-lib`, `@pdf-lib/fontkit` | Completare PDF și încorporare fonturi |
-| `server-only` | Protejarea modulelor destinate exclusiv serverului |
+| Pachet                                              | Rol                                                |
+| --------------------------------------------------- | -------------------------------------------------- |
+| `next`                                              | Framework web, App Router și API routes            |
+| `react`, `react-dom`                                | Interfață și randare React                         |
+| `@prisma/client`                                    | Acces la baza de date prin Prisma                  |
+| `@t3-oss/env-nextjs`                                | Utilitare pentru variabile de mediu Next.js        |
+| `@trpc/client`, `@trpc/react-query`, `@trpc/server` | API tRPC și integrarea cu React Query              |
+| `@tanstack/react-query`                             | Cache și gestionarea cererilor asincrone           |
+| `zod`                                               | Validarea schemelor de intrare și a datelor        |
+| `superjson`                                         | Serializarea datelor folosite de tRPC              |
+| `prisma`                                            | Schema, clientul și comenzile pentru baza de date  |
+| `leaflet`, `react-leaflet`                          | Hărți și componente geografice                     |
+| `pdf-lib`, `@pdf-lib/fontkit`                       | Completare PDF și încorporare fonturi              |
+| `server-only`                                       | Protejarea modulelor destinate exclusiv serverului |
 
 ### Dependențe de dezvoltare
 
-| Pachet | Rol |
-|---|---|
-| `typescript` | Compilator și verificare TypeScript |
-| `eslint`, `eslint-config-next`, `typescript-eslint` | Analiză statică și reguli de cod |
-| `prettier`, `prettier-plugin-tailwindcss` | Formatarea fișierelor |
-| `@types/node`, `@types/react`, `@types/react-dom`, `@types/leaflet` | Definiții TypeScript pentru biblioteci |
-| `@eslint/eslintrc` | Compatibilitate/configurare ESLint |
-| `tailwindcss`, `@tailwindcss/postcss`, `postcss` | Instrumente CSS incluse în setup-ul proiectului |
+| Pachet                                                              | Rol                                             |
+| ------------------------------------------------------------------- | ----------------------------------------------- |
+| `typescript`                                                        | Compilator și verificare TypeScript             |
+| `eslint`, `eslint-config-next`, `typescript-eslint`                 | Analiză statică și reguli de cod                |
+| `prettier`, `prettier-plugin-tailwindcss`                           | Formatarea fișierelor                           |
+| `@types/node`, `@types/react`, `@types/react-dom`, `@types/leaflet` | Definiții TypeScript pentru biblioteci          |
+| `@eslint/eslintrc`                                                  | Compatibilitate/configurare ESLint              |
+| `tailwindcss`, `@tailwindcss/postcss`, `postcss`                    | Instrumente CSS incluse în setup-ul proiectului |
 
 ## Cerințe de sistem
 
@@ -200,21 +203,21 @@ Serverul de producție folosește implicit portul 3000; se poate configura portu
 
 ## Comenzi disponibile
 
-| Comandă | Descriere |
-|---|---|
-| `npm run dev` | Pornește mediul Next.js de dezvoltare cu Turbopack |
-| `npm run build` | Creează build-ul optimizat pentru producție |
-| `npm run start` | Pornește build-ul de producție |
-| `npm run preview` | Construiește și pornește aplicația pentru previzualizare |
-| `npm run lint` | Rulează ESLint |
-| `npm run typecheck` | Verifică tipurile TypeScript |
-| `npm run check` | Rulează ESLint și TypeScript |
-| `npm run format:check` | Verifică formatarea fișierelor |
-| `npm run format:write` | Formatează fișierele acceptate de script |
-| `npm run db:generate` | Generează clientul Prisma |
-| `npm run db:push` | Aplică schema Prisma în baza de date configurată |
-| `npm run db:migrate` | Aplică migrațiile Prisma versionate, dacă există |
-| `npm run db:studio` | Deschide interfața Prisma Studio |
+| Comandă                | Descriere                                                |
+| ---------------------- | -------------------------------------------------------- |
+| `npm run dev`          | Pornește mediul Next.js de dezvoltare cu Turbopack       |
+| `npm run build`        | Creează build-ul optimizat pentru producție              |
+| `npm run start`        | Pornește build-ul de producție                           |
+| `npm run preview`      | Construiește și pornește aplicația pentru previzualizare |
+| `npm run lint`         | Rulează ESLint                                           |
+| `npm run typecheck`    | Verifică tipurile TypeScript                             |
+| `npm run check`        | Rulează ESLint și TypeScript                             |
+| `npm run format:check` | Verifică formatarea fișierelor                           |
+| `npm run format:write` | Formatează fișierele acceptate de script                 |
+| `npm run db:generate`  | Generează clientul Prisma                                |
+| `npm run db:push`      | Aplică schema Prisma în baza de date configurată         |
+| `npm run db:migrate`   | Aplică migrațiile Prisma versionate, dacă există         |
+| `npm run db:studio`    | Deschide interfața Prisma Studio                         |
 
 În configurația actuală nu există un director cu migrații versionate; pentru configurarea inițială sau actualizarea bazei SQLite locale folosește `npm run db:push`.
 

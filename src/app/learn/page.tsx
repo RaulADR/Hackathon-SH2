@@ -268,7 +268,7 @@ export default function LearnPage() {
           </span>
           <h2>
             {ro
-              ? "Sesiune de test pentru categoria Open"
+              ? "Sesiune de test pentru categoria deschisă"
               : "Open category practice session"}
           </h2>
         </div>
@@ -472,7 +472,7 @@ export default function LearnPage() {
             target="_blank"
             rel="noreferrer"
           >
-            EASA drone rules ↗
+            {ro ? "Reguli EASA pentru drone ↗" : "EASA drone rules ↗"}
           </a>
         </article>
         <article className="content-card guidance-card">

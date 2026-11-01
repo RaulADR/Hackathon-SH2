@@ -32,7 +32,7 @@ export function SignaturePad({ value, onChange, romanian }: SignaturePadProps) {
       context.lineWidth = 2.4;
       context.lineCap = "round";
       context.lineJoin = "round";
-      context.strokeStyle = "#18263c";
+      context.strokeStyle = "#3a1d7a";
 
       if (value) {
         const image = new window.Image();
@@ -63,7 +63,7 @@ export function SignaturePad({ value, onChange, romanian }: SignaturePadProps) {
     const point = getPoint(event);
     context.beginPath();
     context.arc(point.x, point.y, 1.2, 0, Math.PI * 2);
-    context.fillStyle = "#18263c";
+    context.fillStyle = "#3a1d7a";
     context.fill();
     context.beginPath();
     context.moveTo(point.x, point.y);

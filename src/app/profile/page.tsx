@@ -473,7 +473,7 @@ export default function ProfilePage() {
                       ? "Editează aeronava"
                       : "Edit aircraft"
                     : romanian
-                      ? "Configurează aeronava"
+                      ? "Configurează drona"
                       : "Set up your aircraft"}
                 </strong>
                 <span>

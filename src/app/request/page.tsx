@@ -18,12 +18,13 @@ import {
   hasUnmappedTowerContact,
   isTowerContact,
 } from "~/lib/ctr";
-import { normalizeDrones, type DroneClass, type PilotDrone } from "~/lib/drone";
+import { normalizeDrones, type PilotDrone } from "~/lib/drone";
 import {
   areasOverlap,
   geoJsonRingToLatLng,
   type LatLngPoint,
 } from "~/lib/geometry";
+import type { LocalPlan } from "~/lib/local-plan";
 import { getRomaniaTime } from "~/lib/time";
 import { api } from "~/trpc/react";
 
@@ -36,33 +37,6 @@ type ZoneCollection = FeatureCollection<
   GeoPolygon | MultiPolygon,
   ZoneProperties
 >;
-type PlanStatus = "prepared" | "sent" | "approved";
-type LocalPlan = {
-  id: string;
-  flightDate: string;
-  startTime: string;
-  endTime: string;
-  area: LatLngPoint[];
-  drone: string;
-  purpose: string;
-  pilot: string;
-  email: string;
-  phone: string;
-  operatorId: string;
-  location: string;
-  registration: string;
-  insuranceUntil: string;
-  contacts: string[];
-  droneMassGrams?: number;
-  droneClass?: DroneClass;
-  tower?: string;
-  flightCategory?: string;
-  operationMode?: string;
-  maxAltitude?: string;
-  signatureDataUrl?: string;
-  ctrIndicator?: boolean;
-  status: PlanStatus;
-};
 type PilotProfile = {
   name?: string;
   firstName?: string;
@@ -77,7 +51,6 @@ type PilotProfile = {
 };
 const PLANS_KEY = "aerio.localPlans";
 const AREA_KEY = "aerio.flightArea";
-const APPROVED_KEY = "aerio.approvedPlans";
 
 function pilotFullName(profile: PilotProfile): string {
   const fullName = [profile.firstName, profile.lastName]
@@ -132,96 +105,9 @@ function getDefaultFlightDate(): string {
   return nextDate.toISOString().slice(0, 10);
 }
 
-function downloadPackage(plan: LocalPlan, romanian: boolean) {
-  const contents = [
-    romanian
-      ? "AERIO — PACHET DE PREGĂTIRE A CERERII DE ZBOR"
-      : "AERIO — FLIGHT REQUEST PREPARATION PACKAGE",
-    romanian
-      ? "Document de planificare, nu reprezintă o cerere oficială, un plan de zbor sau permisiunea de a zbura."
-      : "Planning document only. Not an official application, flight plan, or permission to fly.",
-    "",
-    `${romanian ? "Pilot" : "Pilot"}: ${plan.pilot || (romanian ? "Necompletat" : "Not provided")}`,
-    `Email: ${plan.email || (romanian ? "Necompletat" : "Not provided")}`,
-    `${romanian ? "Telefon" : "Phone"}: ${plan.phone || (romanian ? "Necompletat" : "Not provided")}`,
-    `${romanian ? "ID operator AACR" : "AACR operator ID"}: ${plan.operatorId || (romanian ? "Necompletat" : "Not provided")}`,
-    `${romanian ? "Localitate / adresă" : "Location / address"}: ${plan.location || (romanian ? "Necompletat" : "Not provided")}`,
-    `${romanian ? "Înregistrare dronă" : "Drone registration"}: ${plan.registration || (romanian ? "Necompletat" : "Not provided")}`,
-    `${romanian ? "Asigurare valabilă până la" : "Insurance valid until"}: ${plan.insuranceUntil || (romanian ? "Necompletat" : "Not provided")}`,
-    `${romanian ? "Data" : "Date"}: ${plan.flightDate}`,
-    `${romanian ? "Ora propusă" : "Proposed time"}: ${plan.startTime}–${plan.endTime} (${romanian ? "ora României" : "Romania local time"})`,
-    `${romanian ? "Dronă" : "Drone"}: ${plan.drone}`,
-    `${romanian ? "Scop" : "Purpose"}: ${plan.purpose}`,
-    `${romanian ? "Coordonatele zonei (latitudine, longitudine)" : "Area vertices (latitude, longitude)"}: ${plan.area.map(([lat, lng]) => `${lat.toFixed(6)}, ${lng.toFixed(6)}`).join("; ")}`,
-    `${romanian ? "Contacte ROMATSA găsite în setul local" : "ROMATSA zone contacts found in local dataset"}: ${plan.contacts.join(", ") || (romanian ? "Nu a fost găsită nicio adresă de email" : "No email address found")}`,
-    "",
-    romanian
-      ? "Verifică harta ROMATSA actuală, NOTAM-urile, AIP-ul și instrucțiunile autorităților. Trimite documentele personal prin canalele oficiale relevante."
-      : "Verify the current ROMATSA map, NOTAMs, AIP and authority instructions. Submit through the relevant official channels yourself.",
-  ].join("\r\n");
-  const blob = new Blob([contents], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `aerio-flight-request-${plan.flightDate}.txt`;
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-  const geoJson = {
-    type: "Feature",
-    properties: {
-      application: "Aerio planning draft",
-      flightDate: plan.flightDate,
-    },
-    geometry: {
-      type: "Polygon",
-      coordinates: [
-        [
-          ...plan.area.map(([lat, lng]) => [lng, lat]),
-          [plan.area[0]![1], plan.area[0]![0]],
-        ],
-      ],
-    },
-  };
-  const geoBlob = new Blob([JSON.stringify(geoJson, null, 2)], {
-    type: "application/geo+json",
-  });
-  const geoUrl = URL.createObjectURL(geoBlob);
-  const geoAnchor = document.createElement("a");
-  geoAnchor.href = geoUrl;
-  geoAnchor.download = `aerio-flight-area-${plan.flightDate}.geojson`;
-  geoAnchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(geoUrl), 1000);
-}
-
-function emailDraftUrl(plan: LocalPlan, romanian: boolean) {
-  const subject = `${romanian ? "Cerere zbor dronă" : "Drone flight request"} · ${plan.flightDate}`;
-  const body = [
-    romanian ? "Bună ziua," : "Hello,",
-    "",
-    romanian
-      ? "Vă rog să analizați detaliile propuse mai jos. Acest mesaj este o ciornă și nu a fost trimis."
-      : "Please review the proposed flight details below. This is a draft and has not been sent.",
-    `${romanian ? "Data și ora" : "Date and time"}: ${plan.flightDate} · ${plan.startTime}–${plan.endTime}`,
-    `${romanian ? "Dronă" : "Drone"}: ${plan.drone}`,
-    `${romanian ? "Scop" : "Purpose"}: ${plan.purpose}`,
-    `${romanian ? "Pilot" : "Pilot"}: ${plan.pilot}`,
-    `Email: ${plan.email}`,
-    `${romanian ? "Telefon" : "Phone"}: ${plan.phone || (romanian ? "Necompletat" : "Not provided")}`,
-    `${romanian ? "ID operator AACR" : "AACR operator ID"}: ${plan.operatorId || (romanian ? "Necompletat" : "Not provided")}`,
-    `${romanian ? "Localitate / adresă" : "Location / address"}: ${plan.location || (romanian ? "Necompletat" : "Not provided")}`,
-    `${romanian ? "Înregistrare dronă" : "Drone registration"}: ${plan.registration || (romanian ? "Necompletat" : "Not provided")}`,
-    "",
-    `${romanian ? "Cu stimă" : "Regards"},`,
-    plan.pilot,
-  ].join("\n");
-  return `mailto:${plan.contacts.join(",")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
 export default function RequestPage() {
   const romanian = useRomanian();
   const [area, setArea] = useState<LatLngPoint[]>([]);
-  const [plans, setPlans] = useState<LocalPlan[]>([]);
   const [profile, setProfile] = useState<PilotProfile>({});
   const [zones, setZones] = useState<ZoneCollection | null>(null);
   const [flightDate, setFlightDate] = useState("");
@@ -280,11 +166,9 @@ export default function RequestPage() {
         ctrIndicator: ctrContactZones.length > 0,
         status: "prepared",
       };
-      setPlans((previous) => {
-        const next = [plan, ...previous];
-        localStorage.setItem(PLANS_KEY, JSON.stringify(next));
-        return next;
-      });
+      const savedPlans = readJson<LocalPlan[]>(PLANS_KEY, []);
+      localStorage.setItem(PLANS_KEY, JSON.stringify([plan, ...savedPlans]));
+      window.dispatchEvent(new Event("aerio:plans-updated"));
       setStartTime("");
       setSignatureDataUrl("");
       void utils.flight.candidateTimes.invalidate();
@@ -293,18 +177,6 @@ export default function RequestPage() {
 
   useEffect(() => {
     setArea(readJson<LatLngPoint[]>(AREA_KEY, []));
-    const savedPlans = readJson<LocalPlan[]>(PLANS_KEY, []);
-    setPlans(
-      savedPlans.map((plan) => ({
-        ...plan,
-        phone: plan.phone ?? "",
-        operatorId: plan.operatorId ?? "",
-        location: plan.location ?? "",
-        registration: plan.registration ?? "",
-        insuranceUntil: plan.insuranceUntil ?? "",
-        contacts: extractEmailAddresses((plan.contacts ?? []).join(" ")),
-      })),
-    );
     const savedProfile = readJson<PilotProfile>("aerio.profile", {});
     const savedDrones = normalizeDrones(savedProfile.drones);
     setProfile({ ...savedProfile, drones: savedDrones });
@@ -373,29 +245,6 @@ export default function RequestPage() {
   const overlapsRestrictedZone = intersectingZones.some((feature) =>
     /restricted|restricționat/i.test(feature.properties?.status ?? ""),
   );
-
-  function updatePlan(id: string, status: PlanStatus) {
-    setPlans((current) => {
-      const next = current.map((plan) =>
-        plan.id === id ? { ...plan, status } : plan,
-      );
-      localStorage.setItem(PLANS_KEY, JSON.stringify(next));
-      if (status === "approved") {
-        const plan = next.find((item) => item.id === id);
-        const approved = readJson<{ id: string; area: LatLngPoint[] }[]>(
-          APPROVED_KEY,
-          [],
-        );
-        if (plan && !approved.some((item) => item.id === id)) {
-          localStorage.setItem(
-            APPROVED_KEY,
-            JSON.stringify([...approved, { id, area: plan.area }]),
-          );
-        }
-      }
-      return next;
-    });
-  }
 
   function createPlan(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -584,11 +433,6 @@ export default function RequestPage() {
           ? "Alege zona, aeronava și un interval candidat, apoi pregătește documentele."
           : "Choose the area, aircraft and a candidate time, then prepare your documents."}
       </p>
-      <div className="notice notice-warning prominent-notice">
-        {romanian
-          ? "Intervalele candidate verifică doar ciornele suprapuse salvate în baza de date Aerio a acestei instalări. Nu reprezintă disponibilitate în timp real sau intervale aprobate de autorități."
-          : "Candidate times only check overlapping planning drafts saved to this Aerio database. They are not live airspace availability or authority-approved slots."}
-      </div>
       <div className="request-layout">
         <section className="content-card request-form-card">
           <form onSubmit={createPlan}>
@@ -791,10 +635,14 @@ export default function RequestPage() {
                         {romanian ? "Alege modul" : "Select mode"}
                       </option>
                       <option value="Visual Line Of Sight (VLOS)">
-                        Visual Line Of Sight (VLOS)
+                        {romanian
+                          ? "În raza vizuală directă (VLOS)"
+                          : "Visual Line Of Sight (VLOS)"}
                       </option>
                       <option value="Beyond Visual Line Of Sight (BVLOS)">
-                        Beyond Visual Line Of Sight (BVLOS)
+                        {romanian
+                          ? "În afara razei vizuale (BVLOS)"
+                          : "Beyond Visual Line Of Sight (BVLOS)"}
                       </option>
                     </select>
                   </label>
@@ -1046,136 +894,6 @@ export default function RequestPage() {
           </section>
         </aside>
       </div>
-      <section className="content-card plans-section">
-        <div className="section-heading">
-          <span className="eyebrow">
-            {romanian
-              ? "PLANURI SALVATE · ACEST DISPOZITIV"
-              : "SAVED PLANS · THIS DEVICE"}
-          </span>
-          <h2>{romanian ? "Pachete de cerere" : "Request packages"}</h2>
-        </div>
-        <p className="small-note">
-          {romanian
-            ? "Anexa 1 este formular pentru operațiuni în CTR. Setul ROMATSA inclus nu clasifică explicit CTR-urile; verifică dacă formularul și turnul selectat se aplică zborului tău."
-            : "Anexa 1 is for CTR operations. The bundled ROMATSA data does not explicitly classify CTRs; verify that this form and the selected tower apply to your flight."}
-        </p>
-        {plans.length === 0 ? (
-          <p className="muted">
-            {romanian
-              ? "Pachetele de cerere înregistrate local vor apărea aici."
-              : "Your locally recorded request packages will appear here."}
-          </p>
-        ) : (
-          <div className="plan-list">
-            {plans.map((plan) => (
-              <article className="plan-row" key={plan.id}>
-                <div>
-                  <strong>
-                    {plan.flightDate} · {plan.startTime}–{plan.endTime}
-                  </strong>
-                  <span>
-                    {plan.drone} · {plan.purpose}
-                  </span>
-                  <span className={`plan-status status-${plan.status}`}>
-                    {plan.status === "prepared"
-                      ? romanian
-                        ? "Pregătit · netrimis"
-                        : "Prepared · not sent"
-                      : plan.status === "sent"
-                        ? romanian
-                          ? "Marcat ca trimis local"
-                          : "Marked sent locally"
-                        : romanian
-                          ? "Aprobare înregistrată local"
-                          : "Approval recorded locally"}
-                  </span>
-                </div>
-                <div className="plan-actions">
-                  <button
-                    className="button button-primary"
-                    type="button"
-                    onClick={() => void downloadAnexa1(plan)}
-                    disabled={
-                      pdfDownloadId === plan.id || !plan.signatureDataUrl
-                    }
-                  >
-                    {pdfDownloadId === plan.id
-                      ? romanian
-                        ? "Se generează PDF-ul…"
-                        : "Generating PDF…"
-                      : romanian
-                        ? "Descarcă PDF · Anexa 1"
-                        : "Download PDF · Anexa 1"}
-                  </button>
-                  {!plan.signatureDataUrl && (
-                    <span className="field-hint">
-                      {romanian
-                        ? "Cerere veche, fără semnătură. Creează una nouă pentru a genera PDF-ul."
-                        : "Legacy request without a signature. Create a new request to generate its PDF."}
-                    </span>
-                  )}
-                  <button
-                    className="button button-quiet"
-                    type="button"
-                    onClick={() => downloadPackage(plan, romanian)}
-                  >
-                    {romanian ? "Descarcă pachetul" : "Download package"}
-                  </button>
-                  {plan.contacts.length > 0 && (
-                    <a
-                      className="button button-quiet"
-                      href={emailDraftUrl(plan, romanian)}
-                    >
-                      {romanian ? "Deschide ciorna email" : "Open email draft"}
-                    </a>
-                  )}
-                  {plan.status === "prepared" && (
-                    <button
-                      className="button button-quiet"
-                      type="button"
-                      onClick={() => updatePlan(plan.id, "sent")}
-                    >
-                      {romanian ? "Marchează trimis" : "Mark sent"}
-                    </button>
-                  )}
-                  {plan.status !== "approved" && (
-                    <button
-                      className="button button-quiet"
-                      type="button"
-                      onClick={() => updatePlan(plan.id, "approved")}
-                    >
-                      {romanian
-                        ? "Înregistrează aprobarea"
-                        : "Record authority approval"}
-                    </button>
-                  )}
-                </div>
-                {pdfError && pdfErrorPlanId === plan.id && (
-                  <p className="notice notice-warning" role="alert">
-                    {romanian
-                      ? "PDF-ul Anexa 1 nu a putut fi generat: "
-                      : "Could not generate the Anexa 1 PDF: "}
-                    {pdfError}
-                  </p>
-                )}
-                {plan.ctrIndicator && (
-                  <p className="small-note">
-                    {romanian
-                      ? "Datele rămân în acest browser. PDF-ul este o copie de lucru, nu este trimis automat și nu reprezintă o aprobare; verifică-l, semnează-l și confirmă cerințele oficiale."
-                      : "Your data stays in this browser. The PDF is a working copy, is not submitted automatically, and is not an approval; review and sign it, then confirm official requirements."}
-                  </p>
-                )}
-              </article>
-            ))}
-          </div>
-        )}
-        <p className="small-note">
-          {romanian
-            ? "„Marchează trimis” și „Înregistrează aprobarea” actualizează doar acest browser. Aerio nu trimite emailuri și nu verifică aprobări. Aprobările înregistrate local apar pe hartă doar pe acest dispozitiv."
-            : "“Mark sent” and “Record authority approval” only update this browser. Aerio does not send emails or verify approvals. Locally recorded approvals appear as map overlays on this device."}
-        </p>
-      </section>
     </>
   );
 }
