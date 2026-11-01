@@ -5,23 +5,20 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useRomanian } from "~/app/_components/language-context";
-
-const demoSession = {
-  mode: "demo",
-  email: "demo@aerio.app",
-  name: "Demo Pilot",
-};
+import { api } from "~/trpc/react";
 
 export function AuthPage({ mode }: { mode: "login" | "signup" }) {
   const romanian = useRomanian();
   const router = useRouter();
+  const utils = api.useUtils();
   const [message, setMessage] = useState("");
   const isSignup = mode === "signup";
 
-  function submitCredentials(event: React.FormEvent<HTMLFormElement>) {
+  async function submitCredentials(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setMessage("");
+    const formData = new FormData(event.currentTarget);
     if (isSignup) {
-      const formData = new FormData(event.currentTarget);
       if (formData.get("password") !== formData.get("confirmPassword")) {
         setMessage(
           romanian ? "Parolele nu coincid." : "The passwords do not match.",
@@ -29,29 +26,51 @@ export function AuthPage({ mode }: { mode: "login" | "signup" }) {
         return;
       }
     }
-    setMessage(
-      romanian
-        ? isSignup
-          ? "Crearea contului nu este configurată încă. Datele introduse nu au fost trimise sau salvate."
-          : "Autentificarea reală nu este configurată încă. Datele introduse nu au fost trimise sau salvate."
-        : isSignup
-          ? "Account creation is not configured yet. The details you entered were not sent or saved."
-          : "Real sign-in is not configured yet. The details you entered were not sent or saved.",
-    );
-  }
-
-  function continueAsDemo() {
     try {
-      localStorage.setItem("aerio.session", JSON.stringify(demoSession));
-      localStorage.setItem("aerio.demoAccess", "true");
-      window.dispatchEvent(new Event("aerio:session-updated"));
-      router.push("/");
+      const response = await fetch(
+        isSignup ? "/api/auth/register" : "/api/auth/login",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name: formData.get("name"),
+            email: formData.get("email"),
+            password: formData.get("password"),
+          }),
+        },
+      );
+      let result: unknown;
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error(
+          romanian
+            ? "Autentificarea nu a reușit. Încearcă din nou."
+            : "Account access failed. Please try again.",
+        );
+      }
+      if (!response.ok) {
+        const errorMessage =
+          typeof result === "object" &&
+          result !== null &&
+          "error" in result &&
+          typeof result.error === "string"
+            ? result.error
+            : romanian
+              ? "Autentificarea nu a reușit. Încearcă din nou."
+              : "Account access failed. Please try again.";
+        throw new Error(errorMessage);
+      }
+      await utils.auth.me.invalidate();
+      router.replace("/");
     } catch (error) {
-      console.error("Could not start the local demo session.", error);
+      console.error("Could not authenticate the account.", error);
       setMessage(
-        romanian
-          ? "Sesiunea demo nu a putut fi pornită în acest browser."
-          : "The demo session could not be started in this browser.",
+        error instanceof Error
+          ? error.message
+          : romanian
+            ? "Autentificarea nu a reușit. Încearcă din nou."
+            : "Account access failed. Please try again.",
       );
     }
   }
@@ -105,8 +124,8 @@ export function AuthPage({ mode }: { mode: "login" | "signup" }) {
           </ul>
           <p className="login-local-note">
             {romanian
-              ? "Datele demo sunt salvate doar în browserul tău. Aerio nu oferă autorizare oficială."
-              : "Demo data stays in your browser. Aerio does not provide official flight clearance."}
+              ? "Profilul, dronele și planurile sunt salvate în cont. Aerio nu oferă autorizare oficială."
+              : "Your profile, drones, and flight plans are saved to your account. Aerio does not provide official flight clearance."}
           </p>
         </section>
 
@@ -133,8 +152,8 @@ export function AuthPage({ mode }: { mode: "login" | "signup" }) {
                   ? "Creează un profil pentru a-ți pregăti zborurile."
                   : "Create a profile to prepare your flights."
                 : romanian
-                  ? "Autentifică-te sau explorează aplicația cu un cont demo."
-                  : "Sign in or explore the app with a demo account."}
+                  ? "Autentifică-te pentru a accesa profilul și zborurile salvate."
+                  : "Sign in or create an account to manage your flights."}
             </p>
           </div>
 
@@ -221,26 +240,6 @@ export function AuthPage({ mode }: { mode: "login" | "signup" }) {
             </button>
           </form>
 
-          <div className="login-divider">
-            <span>{romanian ? "sau" : "or"}</span>
-          </div>
-
-          <button
-            className="button button-success demo-login-button"
-            type="button"
-            onClick={continueAsDemo}
-          >
-            <span aria-hidden="true">✦</span>
-            {romanian
-              ? "Continuă cu contul demo"
-              : "Continue with demo account"}
-          </button>
-          <p className="small-note login-demo-note">
-            {romanian
-              ? "Intrarea demo se memorează pe acest dispozitiv, ca să nu mai vezi acest ecran la următoarea vizită."
-              : "Demo access is remembered on this device, so you won’t see this screen next time."}
-          </p>
-
           {message && (
             <p className="notice notice-warning login-message" role="alert">
               {message}
@@ -249,8 +248,8 @@ export function AuthPage({ mode }: { mode: "login" | "signup" }) {
 
           <p className="login-security-note">
             {romanian
-              ? "Conturile prin email/parolă nu sunt active încă. Datele introduse nu sunt trimise sau salvate."
-              : "Email/password accounts are not enabled yet. Details entered here are not sent or saved."}
+              ? "Parolele sunt stocate sub formă derivată, iar sesiunea este păstrată într-un cookie securizat."
+              : "Passwords are stored as derived hashes, and sign-in uses a secure session cookie."}
           </p>
         </section>
       </div>

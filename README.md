@@ -1,6 +1,6 @@
 # Aerio
 
-**Aerio** este o aplicație web de planificare a zborurilor cu drone în România. Reunește o hartă cu zone de referință, un profil local de pilot și flotă, planificarea unui zbor și generarea automata a anexelor necesare pentru zbor.
+**Aerio** este o aplicație web de planificare a zborurilor cu drone în România. Reunește o hartă cu zone de referință, un profil de pilot și flotă salvat în cont, planificarea unui zbor și generarea automată a anexelor necesare pentru zbor.
 
 > **Important:** Aerio este un prototip de planificare, nu o aplicație oficială AACR sau ROMATSA. Datele aeronautice incluse nu sunt live. Aplicația nu rezervă spațiu aerian, nu trimite cereri către autorități și nu acordă aprobări. Verifică întotdeauna informațiile și cerințele actuale din surse oficiale înainte de zbor.
 
@@ -14,7 +14,7 @@
 - [Instalare și pornire locală](#instalare-și-pornire-locală)
 - [Comenzi disponibile](#comenzi-disponibile)
 - [Structura proiectului](#structura-proiectului)
-- [Date locale și confidențialitate](#date-locale-și-confidențialitate)
+- [Date și confidențialitate](#date-și-confidențialitate)
 - [Limitări și verificări înainte de zbor](#limitări-și-verificări-înainte-de-zbor)
 - [Surse oficiale](#surse-oficiale)
 
@@ -23,7 +23,7 @@
 ### Panou principal
 
 - Oferă acces rapid la hartă, planificarea unui zbor, profil și ghid.
-- Afișează zborurile salvate local și statusul lor: pregătit, marcat ca trimis sau aprobare înregistrată local.
+- Afișează zborurile salvate în cont și statusul lor: pregătit, marcat ca trimis sau aprobare înregistrată.
 - Bara de sus este transparentă și discretă pe toate paginile aplicației.
 - Include acces la pagina separată „Zborurile mele” imediat după „Planifică zbor” în navigare; acolo sunt listate cererile și statusurile lor.
 - Prezintă pe scurt pașii de planificare și linkuri către surse oficiale.
@@ -38,7 +38,7 @@
 
 ### Profil și flotă
 
-- Păstrează local datele operatorului/pilotului, inclusiv numele, datele de contact și ID-ul de operator.
+- Păstrează în cont datele operatorului/pilotului, inclusiv numele, datele de contact și ID-ul de operator.
 - Permite salvarea mai multor drone, cu poreclă, model, masă, clasă, model de cameră și rezoluție.
 - Include modele și configurații de cameră prestabilite, precum și posibilitatea de a gestiona dronele din profil.
 - Drona selectată este folosită la pregătirea cererii și la completarea câmpurilor relevante din Anexa 1.
@@ -52,7 +52,7 @@
 - Cere o semnătură digitala fiecare cerere.
 - Poate genera în browser un proiect PDF Anexa 1, precum și un rezumat al cererii și un fișier GeoJSON al poligonului.
 - Poate deschide o ciornă de email către contactele extrase din zonele intersectate.
-- Permite marcarea locală a unei cereri ca trimisă sau aprobarea ei înregistrată. Aceste acțiuni nu trimit emailuri și nu verifică aprobări reale(demo).
+- Permite salvarea în cont a statusului unei cereri ca trimisă sau a unei aprobări înregistrate. Aceste acțiuni nu trimit emailuri și nu verifică aprobări oficiale.
 
 ### Ghid și test de pregătire
 
@@ -60,16 +60,17 @@
 - Oferă întrebări de exercițiu pentru categoriile A1, A2 și A3, cu feedback și explicații.
 - Testul este doar pentru exersare; nu este examen oficial și nu acordă un certificat.
 
-### Limbă, temă și acces demo
+### Limbă, temă și conturi
 
 - Interfața poate fi afișată în română sau engleză.
 - Tema luminoasă/albă și tema întunecată pot fi schimbate din interfață.
-- Ecranele de autentificare și creare cont oferă acces la o sesiune demo locală.
-- Formularele email/parolă sunt doar interfețe demonstrative. Autentificarea și crearea contului nu sunt active; datele introduse nu sunt trimise sau salvate.
+- Utilizatorii se pot înregistra și autentifica folosind email și parolă.
+- Sesiunile folosesc cookie-uri HttpOnly, iar parolele sunt stocate ca hash-uri scrypt.
+- Profilul pilotului, flota, planurile de zbor și metadatele documentelor sunt separate per cont.
 
 ## Tutorial de utilizare
 
-1. **Deschide aplicația.** La prima vizită, alege „Continuă cu contul demo”. Sesiunea demo se memorează în browserul curent.
+1. **Deschide aplicația.** Creează un cont cu email și parolă sau autentifică-te.
 2. **Completează profilul.** Introdu numele pilotului și ID-ul operatorului AACR, apoi salvează una sau mai multe drone în flotă. Pentru document, selectează clasa certificată corectă și completează detaliile camerei.
 3. **Desenează zona de zbor.** Deschide harta, adaugă cel puțin trei puncte, verifică previzualizarea poligonului și salvează zona.
 4. **Verifică zonele intersectate.** Consultă contactele și instrucțiunile afișate, apoi confirmă informațiile pe hărțile și documentele aeronautice oficiale. Pentru imagini, deschide separat MApN AEROFOTO.
@@ -96,13 +97,15 @@
 - **tRPC** oferă API tipizat între interfață și server.
 - **Zod** validează datele primite de procedurile API.
 - **Prisma ORM** accesează baza de date.
-- **SQLite** stochează planurile de zbor folosite la verificarea suprapunerilor în această instalare.
+- **PostgreSQL** stochează conturile, sesiunile, profilele, dronele, planurile de zbor și metadatele documentelor.
 
 ### Bază de date și stocare
 
-- Modelul `FlightPlan` păstrează data, intervalul, zona, drona, scopul și momentul creării.
-- Profilul, semnăturile cererilor, limba, tema, sesiunea demo și statusurile locale sunt stocate în browser (`localStorage`).
-- Nu există conturi reale, autentificare, sincronizare multi-utilizator sau serviciu de stocare cloud configurat.
+- Modelul `User` deține profilul pilotului, dronele, sesiunile și planurile de zbor; `FlightDocument` păstrează numele și tipurile documentelor generate.
+- Detaliile zborului, coordonatele poligonului, semnătura, statusul și metadatele documentelor sunt salvate în PostgreSQL și asociate contului.
+- PDF-ul, rezumatul text și fișierul GeoJSON sunt generate și descărcate în browser; baza păstrează metadatele, nu conținutul fișierelor.
+- Selectarea zonei de zbor, limba interfeței și tema rămân în stocarea browserului.
+- `DATABASE_URL` trebuie configurat cu URL-ul serverului PostgreSQL folosit de instalare. Nu pune credențialele în Git.
 
 ## Dependențe
 
@@ -160,7 +163,7 @@ Comenzile următoare sunt valabile în PowerShell, Command Prompt sau terminalul
    Copy-Item .env.example .env
    ```
 
-   Fișierul `.env.example` folosește `DATABASE_URL="file:./db.sqlite"`, potrivit pentru SQLite local. Nu publica fișierul `.env` și nu introduce secrete în `.env.example`.
+   Înlocuiește valorile `USER`, `PASSWORD`, `HOST` și `DATABASE` din `DATABASE_URL` cu URL-ul serverului PostgreSQL tău. Păstrează credențialele doar în `.env`; nu le publica.
 
 3. Instalează dependențele:
 
@@ -174,10 +177,11 @@ Comenzile următoare sunt valabile în PowerShell, Command Prompt sau terminalul
    npm run db:generate
    ```
 
-4. Creează/actualizează schema SQLite locală:
+4. Generează clientul Prisma și aplică migrațiile versionate:
 
    ```powershell
-   npm run db:push
+   npm run db:generate
+   npm run db:migrate
    ```
 
 5. Pornește serverul de dezvoltare:
@@ -216,10 +220,10 @@ Serverul de producție folosește implicit portul 3000; se poate configura portu
 | `npm run format:write` | Formatează fișierele acceptate de script                 |
 | `npm run db:generate`  | Generează clientul Prisma                                |
 | `npm run db:push`      | Aplică schema Prisma în baza de date configurată         |
-| `npm run db:migrate`   | Aplică migrațiile Prisma versionate, dacă există         |
+| `npm run db:migrate`   | Aplică migrațiile Prisma versionate                      |
 | `npm run db:studio`    | Deschide interfața Prisma Studio                         |
 
-În configurația actuală nu există un director cu migrații versionate; pentru configurarea inițială sau actualizarea bazei SQLite locale folosește `npm run db:push`.
+`npm run db:push` rămâne disponibil pentru prototipare locală; folosește migrațiile versionate pentru instalări persistente.
 
 ## Structura proiectului
 
@@ -229,8 +233,8 @@ src/
     _components/           Hartă, semnătură, navigare și componente UI
     airspace/              Pagina hărții
     learn/                 Ghidul și testul de exercițiu
-    login/                 Ecranul demo/autentificare demonstrativă
-    profile/               Profilul local și flota de drone
+    login/                 Autentificare reală
+    profile/               Profilul pilotului și flota de drone
     request/               Planificare și generare documente
   lib/                    Geometrie, drone, contacte TWR și PDF
   server/
@@ -239,7 +243,7 @@ src/
   styles/                 Stilurile aplicației și temele
   trpc/                   Integrarea React/server pentru tRPC
 prisma/
-  schema.prisma           Schema SQLite/Prisma
+  schema.prisma           Schema PostgreSQL/Prisma
 public/
   anexa1.pdf               Formularul PDF folosit ca șablon
   data/                    Setul ROMATSA inclus
@@ -247,19 +251,21 @@ public/
 legacy/                    Prototipul static arhivat
 ```
 
-## Date locale și confidențialitate
+## Date și confidențialitate
 
-- Datele de profil și semnăturile sunt salvate în `localStorage` în browserul folosit. Ștergerea datelor site-ului din browser le poate elimina.
-- Pachetele și statusurile locale sunt păstrate în browser. Planurile de bază pentru intervale (zonă, dată/oră, dronă și scop) sunt înregistrate în SQLite-ul serverului local.
+- Datele personale, semnătura și informațiile de zbor sunt păstrate în baza de date a instalării și asociate contului autentificat.
+- Sesiunile sunt revocabile la deconectare și expiră după 30 de zile. Cookie-ul de sesiune este HttpOnly și SameSite=Lax.
+- Nu există încă verificare email, flux de recuperare/resetare a parolei, limitare persistentă a încercărilor de autentificare sau administrare a retenției. Configurează aceste măsuri înainte de a folosi conturi cu date importante într-un serviciu public.
+- Păstrează baza PostgreSQL și copiile de siguranță într-un spațiu cu acces controlat. Nu publica URL-ul de conexiune sau copii ale bazei.
+- Documentele generate sunt descărcări locale; doar metadatele numelor/tipurilor documentelor sunt păstrate în baza de date.
 - Semnătura desenată este o imagine inserată vizual în PDF; nu este semnătură digitală criptografică și nu verifică identitatea semnatarului.
-- Sesiunea demo nu este un mecanism de autentificare sau control de acces.
-- Înainte de o implementare publică sunt necesare autentificare reală, reguli de acces, protecție împotriva abuzului, politici de retenție a datelor și o configurație de producție securizată.
+- Configurează backup-uri, acces limitat și TLS la serverul PostgreSQL. Validează configurația de producție înainte de publicare.
 
 ## Limitări și verificări înainte de zbor
 
 - Setul ROMATSA din `public/data/romatsa-uav-zones.json` este o copie locală, nu un serviciu live. Verifică actualitatea și instrucțiunile zonei pe sursele oficiale.
 - Datele incluse nu descriu limite CTR oficiale. Identificarea TWR este o mapare a contactelor zonelor care intersectează poligonul; dacă rezultatul este absent sau ambiguu, aplicația nu ghicește turnul și blochează generarea Anexa 1. Confirmă întotdeauna CTR-ul și turnul competent pe hărți și documente oficiale.
-- Interogarea intervalelor verifică doar planurile din baza de date a instalării curente. Nu reflectă zboruri ale altor utilizatori, rezervări ale autorităților, NOTAM-uri sau disponibilitate reală.
+- Interogarea intervalelor verifică planurile din baza de date partajată a instalării. Nu reflectă rezervări ale autorităților, NOTAM-uri sau disponibilitate reală.
 - Datele de masă, modelele de drone, clasele și camerele prestabilite sunt ajutoare de configurare, nu specificații garantate. Verifică eticheta clasei și documentația aeronavei tale.
 - Categoria A1/A2/A3 este o regulă simplificată pentru interfață. Eligibilitatea efectivă depinde de clasa și configurația aeronavei, condițiile operațiunii și reglementările în vigoare.
 - Formularul PDF este o ciornă. Revizuiește toate câmpurile, unitățile, destinatarii și documentele înainte de transmiterea manuală. Aerio nu completează automat cerințe care nu sunt disponibile în profil sau în datele zonei.

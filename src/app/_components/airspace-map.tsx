@@ -26,6 +26,7 @@ import {
   geoJsonRingToLatLng,
   type LatLngPoint,
 } from "~/lib/geometry";
+import { api } from "~/trpc/react";
 
 type ZoneProperties = {
   zone_id?: string;
@@ -36,7 +37,6 @@ type ZoneProperties = {
 type ZoneFeature = Feature<GeoPolygon | MultiPolygon, ZoneProperties>;
 type ApprovedArea = { id: string; area: LatLngPoint[] };
 const AREA_KEY = "aerio.flightArea";
-const APPROVED_KEY = "aerio.approvedPlans";
 
 function readArea(): LatLngPoint[] {
   try {
@@ -45,18 +45,6 @@ function readArea(): LatLngPoint[] {
       return stored as LatLngPoint[];
   } catch (error) {
     console.error("Could not read the saved flight area.", error);
-  }
-  return [];
-}
-
-function readApprovedAreas(): ApprovedArea[] {
-  try {
-    const stored: unknown = JSON.parse(
-      localStorage.getItem(APPROVED_KEY) ?? "[]",
-    );
-    if (Array.isArray(stored)) return stored as ApprovedArea[];
-  } catch (error) {
-    console.error("Could not read locally recorded approvals.", error);
   }
   return [];
 }
@@ -90,10 +78,10 @@ function ringsFor(feature: ZoneFeature): LatLngPoint[][] {
 export function AirspaceMap() {
   const ro = useRomanian();
   const router = useRouter();
+  const flightsQuery = api.flight.list.useQuery();
   const [drawing, setDrawing] = useState(false);
   const [points, setPoints] = useState<LatLngPoint[]>([]);
   const [area, setArea] = useState<LatLngPoint[]>([]);
-  const [approved, setApproved] = useState<ApprovedArea[]>([]);
   const [zones, setZones] = useState<FeatureCollection<
     GeoPolygon | MultiPolygon,
     ZoneProperties
@@ -101,10 +89,12 @@ export function AirspaceMap() {
   const [zoneError, setZoneError] = useState("");
   const [satellite, setSatellite] = useState(false);
   const [romatsaVisible, setRomatsaVisible] = useState(true);
+  const approved: ApprovedArea[] = (flightsQuery.data ?? [])
+    .filter((flight) => flight.status === "approved")
+    .map(({ id, area: savedArea }) => ({ id, area: savedArea }));
 
   useEffect(() => {
     setArea(readArea());
-    setApproved(readApprovedAreas());
     void fetch("/data/romatsa-uav-zones.json")
       .then(async (response) => {
         if (!response.ok)

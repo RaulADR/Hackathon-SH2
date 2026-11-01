@@ -1,39 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 import { useRomanian } from "~/app/_components/language-context";
+import { api } from "~/trpc/react";
 
 type FlightStatus = "prepared" | "sent" | "approved";
-
-type HomeFlight = {
-  id: string;
-  flightDate: string;
-  startTime: string;
-  endTime: string;
-  drone: string;
-  purpose: string;
-  status: FlightStatus;
-};
-
-const FLIGHTS_STORAGE_KEY = "aerio.localPlans";
-
-function isHomeFlight(value: unknown): value is HomeFlight {
-  if (typeof value !== "object" || value === null) return false;
-  const flight = value as Record<string, unknown>;
-  return (
-    typeof flight.id === "string" &&
-    typeof flight.flightDate === "string" &&
-    typeof flight.startTime === "string" &&
-    typeof flight.endTime === "string" &&
-    typeof flight.drone === "string" &&
-    typeof flight.purpose === "string" &&
-    (flight.status === "prepared" ||
-      flight.status === "sent" ||
-      flight.status === "approved")
-  );
-}
 
 function PinIcon() {
   return (
@@ -129,48 +101,9 @@ const dashboardLinks = [
 
 export default function Home() {
   const ro = useRomanian();
-  const [flights, setFlights] = useState<HomeFlight[]>([]);
-  const [flightsError, setFlightsError] = useState("");
-
-  useEffect(() => {
-    function loadFlights() {
-      try {
-        const stored = localStorage.getItem(FLIGHTS_STORAGE_KEY);
-        const parsed: unknown = stored ? JSON.parse(stored) : [];
-        if (!Array.isArray(parsed)) {
-          throw new Error("Saved flight plans must be a list.");
-        }
-        const validFlights = parsed.filter(isHomeFlight);
-        if (validFlights.length !== parsed.length) {
-          console.error("Some saved flight plans have invalid dashboard data.");
-          setFlightsError(
-            ro
-              ? "Unele zboruri salvate nu pot fi afișate."
-              : "Some saved flights could not be displayed.",
-          );
-        } else {
-          setFlightsError("");
-        }
-        setFlights(validFlights);
-      } catch (error) {
-        console.error("Could not read saved flight plans.", error);
-        setFlightsError(
-          ro
-            ? "Zborurile salvate nu au putut fi citite din acest browser."
-            : "Saved flights could not be read from this browser.",
-        );
-        setFlights([]);
-      }
-    }
-
-    loadFlights();
-    window.addEventListener("storage", loadFlights);
-    window.addEventListener("aerio:plans-updated", loadFlights);
-    return () => {
-      window.removeEventListener("storage", loadFlights);
-      window.removeEventListener("aerio:plans-updated", loadFlights);
-    };
-  }, [ro]);
+  const flightsQuery = api.flight.list.useQuery();
+  const flightsError = flightsQuery.error?.message ?? "";
+  const flights = flightsQuery.data ?? [];
 
   const visibleFlights = [...flights].sort((first, second) =>
     `${first.flightDate}T${first.startTime}`.localeCompare(

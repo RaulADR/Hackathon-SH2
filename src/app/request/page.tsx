@@ -49,7 +49,6 @@ type PilotProfile = {
   insuranceUntil?: string;
   drones?: PilotDrone[] | string[];
 };
-const PLANS_KEY = "aerio.localPlans";
 const AREA_KEY = "aerio.flightArea";
 
 function pilotFullName(profile: PilotProfile): string {
@@ -122,6 +121,7 @@ export default function RequestPage() {
   const [pdfDownloadId, setPdfDownloadId] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState("");
   const [pdfErrorPlanId, setPdfErrorPlanId] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState("");
   const profileDrones = useMemo(
     () => normalizeDrones(profile.drones),
     [profile.drones],
@@ -129,59 +129,24 @@ export default function RequestPage() {
   const profileName = pilotFullName(profile);
   const selectedDrone = profileDrones.find((item) => item.id === drone);
   const utils = api.useUtils();
+  const profileQuery = api.account.profile.useQuery();
   const slotsQuery = api.flight.candidateTimes.useQuery(
     { flightDate, duration, area },
     { enabled: flightDate.length === 10 && area.length >= 3 },
   );
   const preparePlan = api.flight.prepare.useMutation({
-    onSuccess: (saved) => {
-      const contacts = contactEmails;
-      const plan: LocalPlan = {
-        id: saved.id,
-        flightDate,
-        startTime,
-        endTime:
-          slotsQuery.data?.find((slot) => slot.startTime === startTime)
-            ?.endTime ?? "",
-        area,
-        drone: selectedDrone
-          ? `${selectedDrone.nickname} — ${selectedDrone.model} (${selectedDrone.massGrams} g${selectedDrone.droneClass === "none" ? "" : `, ${selectedDrone.droneClass}`}); ${selectedDrone.cameraModel} · ${selectedDrone.cameraResolution}`
-          : drone,
-        purpose,
-        pilot: pilotFullName(profile),
-        email: profile.email ?? "",
-        phone: profile.phone ?? "",
-        operatorId: profile.operatorId ?? "",
-        location: profile.location ?? "",
-        registration: profile.registration ?? "",
-        insuranceUntil: profile.insuranceUntil ?? "",
-        contacts,
-        droneMassGrams: selectedDrone?.massGrams,
-        droneClass: selectedDrone?.droneClass,
-        tower,
-        flightCategory,
-        operationMode,
-        maxAltitude,
-        signatureDataUrl,
-        ctrIndicator: ctrContactZones.length > 0,
-        status: "prepared",
-      };
-      const savedPlans = readJson<LocalPlan[]>(PLANS_KEY, []);
-      localStorage.setItem(PLANS_KEY, JSON.stringify([plan, ...savedPlans]));
-      window.dispatchEvent(new Event("aerio:plans-updated"));
+    onSuccess: () => {
+      setSaveError("");
       setStartTime("");
       setSignatureDataUrl("");
       void utils.flight.candidateTimes.invalidate();
+      void utils.flight.list.invalidate();
     },
+    onError: (error) => setSaveError(error.message),
   });
 
   useEffect(() => {
     setArea(readJson<LatLngPoint[]>(AREA_KEY, []));
-    const savedProfile = readJson<PilotProfile>("aerio.profile", {});
-    const savedDrones = normalizeDrones(savedProfile.drones);
-    setProfile({ ...savedProfile, drones: savedDrones });
-    setDrone(savedDrones[0]?.id ?? "");
-    setFlightCategory(defaultFlightCategory(savedDrones[0]));
     setFlightDate(getDefaultFlightDate());
     void fetch("/data/romatsa-uav-zones.json")
       .then(async (response) => {
@@ -194,6 +159,15 @@ export default function RequestPage() {
         console.error("Could not load ROMATSA contact data.", error),
       );
   }, []);
+
+  useEffect(() => {
+    if (!profileQuery.data) return;
+    const savedProfile = profileQuery.data;
+    const savedDrones = normalizeDrones(savedProfile.drones);
+    setProfile({ ...savedProfile, drones: savedDrones });
+    setDrone(savedDrones[0]?.id ?? "");
+    setFlightCategory(defaultFlightCategory(savedDrones[0]));
+  }, [profileQuery.data]);
 
   const contactEmails = useMemo(() => {
     if (!zones || area.length < 3) return [];
@@ -275,8 +249,15 @@ export default function RequestPage() {
       startTime: selectedSlot.startTime,
       endTime: selectedSlot.endTime,
       area,
-      drone: `${selectedDrone.nickname} — ${selectedDrone.model} (${selectedDrone.massGrams} g, ${selectedDrone.droneClass}); ${selectedDrone.cameraModel || (romanian ? "cameră nespecificată" : "camera not set")} · ${selectedDrone.cameraResolution || (romanian ? "rezoluție nespecificată" : "resolution not set")}`,
+      droneId: selectedDrone.id,
       purpose,
+      contacts: contactEmails,
+      tower,
+      flightCategory,
+      operationMode,
+      maxAltitude,
+      signatureDataUrl,
+      ctrIndicator: ctrContactZones.length > 0,
     });
   }
 
@@ -388,6 +369,7 @@ export default function RequestPage() {
       maxAltitude: maxAltitude || undefined,
       ctrIndicator: ctrContactZones.length > 0,
       status: "prepared",
+      documents: [],
     });
   }
 
@@ -456,8 +438,8 @@ export default function RequestPage() {
                 <span>
                   {area.length >= 3
                     ? romanian
-                      ? "Salvată pe acest dispozitiv"
-                      : "Saved on this device"
+                      ? "Salvată în contul tău"
+                      : "Saved to your account"
                     : romanian
                       ? "Alege mai întâi poligonul pe harta spațiului aerian"
                       : "Choose your polygon on the airspace map first"}
@@ -764,8 +746,8 @@ export default function RequestPage() {
                 {slotsQuery.data?.length === 0 && (
                   <p className="muted">
                     {romanian
-                      ? "Nu există intervale pentru această dată. Încearcă o dată viitoare; se verifică doar ciornele locale salvate."
-                      : "No candidate times for this date. Try a future date; only saved local drafts are checked."}
+                      ? "Nu există intervale pentru această dată. Încearcă o dată viitoare; se verifică toate planurile salvate în instalarea curentă."
+                      : "No candidate times for this date. Try a future date; all saved plans in this installation are checked."}
                   </p>
                 )}
               </div>
@@ -785,9 +767,9 @@ export default function RequestPage() {
               onChange={setSignatureDataUrl}
               romanian={romanian}
             />
-            {preparePlan.error && (
+            {saveError && (
               <p className="notice notice-warning" role="alert">
-                {preparePlan.error.message}
+                {saveError}
               </p>
             )}
             <button
@@ -889,7 +871,7 @@ export default function RequestPage() {
                   : "Add your pilot details to include them in the generated package."}
             </p>
             <Link className="text-link" href="/profile">
-              {romanian ? "Editează profilul local →" : "Edit local profile →"}
+              {romanian ? "Editează profilul →" : "Edit profile →"}
             </Link>
           </section>
         </aside>

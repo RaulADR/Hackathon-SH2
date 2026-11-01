@@ -1,131 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useRomanian } from "~/app/_components/language-context";
 import { createFilledAnexa1, type Anexa1Data } from "~/lib/anexa1-pdf";
-import { extractEmailAddresses } from "~/lib/contacts";
-import type { DroneClass } from "~/lib/drone";
 import type { LocalPlan, PlanStatus } from "~/lib/local-plan";
-
-const PLANS_KEY = "aerio.localPlans";
-const APPROVED_KEY = "aerio.approvedPlans";
-
-const droneClasses: readonly DroneClass[] = [
-  "none",
-  "C0",
-  "C1",
-  "C2",
-  "C3",
-  "C4",
-];
-
-function isDroneClass(value: unknown): value is DroneClass {
-  return (
-    typeof value === "string" &&
-    droneClasses.some((droneClass) => droneClass === value)
-  );
-}
-
-function normalizeLocalPlan(value: unknown): LocalPlan | null {
-  if (typeof value !== "object" || value === null) return null;
-  const plan = value as Record<string, unknown>;
-  if (
-    typeof plan.id !== "string" ||
-    typeof plan.flightDate !== "string" ||
-    typeof plan.startTime !== "string" ||
-    typeof plan.endTime !== "string" ||
-    !Array.isArray(plan.area) ||
-    plan.area.length < 3 ||
-    !plan.area.every(
-      (point) =>
-        Array.isArray(point) &&
-        point.length === 2 &&
-        typeof point[0] === "number" &&
-        typeof point[1] === "number",
-    ) ||
-    typeof plan.drone !== "string" ||
-    typeof plan.purpose !== "string" ||
-    typeof plan.pilot !== "string" ||
-    typeof plan.email !== "string" ||
-    !(
-      plan.status === "prepared" ||
-      plan.status === "sent" ||
-      plan.status === "approved"
-    )
-  ) {
-    return null;
-  }
-  const optionalStrings = [
-    "phone",
-    "operatorId",
-    "location",
-    "registration",
-    "insuranceUntil",
-    "tower",
-    "flightCategory",
-    "operationMode",
-    "maxAltitude",
-    "signatureDataUrl",
-  ] as const;
-  if (
-    optionalStrings.some(
-      (key) => plan[key] !== undefined && typeof plan[key] !== "string",
-    ) ||
-    (plan.droneMassGrams !== undefined &&
-      typeof plan.droneMassGrams !== "number") ||
-    (plan.ctrIndicator !== undefined &&
-      typeof plan.ctrIndicator !== "boolean") ||
-    (plan.droneClass !== undefined && !isDroneClass(plan.droneClass)) ||
-    (plan.contacts !== undefined &&
-      (!Array.isArray(plan.contacts) ||
-        !plan.contacts.every((contact) => typeof contact === "string")))
-  ) {
-    return null;
-  }
-  const contacts = Array.isArray(plan.contacts) ? plan.contacts : [];
-  return {
-    id: plan.id,
-    flightDate: plan.flightDate,
-    startTime: plan.startTime,
-    endTime: plan.endTime,
-    area: plan.area as LocalPlan["area"],
-    drone: plan.drone,
-    purpose: plan.purpose,
-    pilot: plan.pilot,
-    email: plan.email,
-    phone: typeof plan.phone === "string" ? plan.phone : "",
-    operatorId: typeof plan.operatorId === "string" ? plan.operatorId : "",
-    location: typeof plan.location === "string" ? plan.location : "",
-    registration:
-      typeof plan.registration === "string" ? plan.registration : "",
-    insuranceUntil:
-      typeof plan.insuranceUntil === "string" ? plan.insuranceUntil : "",
-    contacts: extractEmailAddresses(contacts.join(" ")),
-    ...(typeof plan.droneMassGrams === "number"
-      ? { droneMassGrams: plan.droneMassGrams }
-      : {}),
-    ...(isDroneClass(plan.droneClass) ? { droneClass: plan.droneClass } : {}),
-    ...(typeof plan.tower === "string" ? { tower: plan.tower } : {}),
-    ...(typeof plan.flightCategory === "string"
-      ? { flightCategory: plan.flightCategory }
-      : {}),
-    ...(typeof plan.operationMode === "string"
-      ? { operationMode: plan.operationMode }
-      : {}),
-    ...(typeof plan.maxAltitude === "string"
-      ? { maxAltitude: plan.maxAltitude }
-      : {}),
-    ...(typeof plan.signatureDataUrl === "string"
-      ? { signatureDataUrl: plan.signatureDataUrl }
-      : {}),
-    ...(typeof plan.ctrIndicator === "boolean"
-      ? { ctrIndicator: plan.ctrIndicator }
-      : {}),
-    status: plan.status,
-  };
-}
+import { api } from "~/trpc/react";
 
 function downloadPackage(plan: LocalPlan, romanian: boolean) {
   const contents = [
@@ -218,99 +99,25 @@ function emailDraftUrl(plan: LocalPlan, romanian: boolean) {
 
 export function MyFlights() {
   const romanian = useRomanian();
-  const [plans, setPlans] = useState<LocalPlan[]>([]);
-  const [loadError, setLoadError] = useState("");
   const [pdfDownloadId, setPdfDownloadId] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState("");
   const [pdfErrorPlanId, setPdfErrorPlanId] = useState<string | null>(null);
-
-  useEffect(() => {
-    function loadPlans() {
-      try {
-        const stored = localStorage.getItem(PLANS_KEY);
-        const parsed: unknown = stored ? JSON.parse(stored) : [];
-        if (!Array.isArray(parsed)) {
-          throw new Error("Saved flight plans must be a list.");
-        }
-        const normalizedPlans = parsed.map(normalizeLocalPlan);
-        const validPlans = normalizedPlans.filter(
-          (plan): plan is LocalPlan => plan !== null,
-        );
-        if (validPlans.length !== parsed.length) {
-          console.error("Some saved flight plans have invalid data.");
-          setLoadError(
-            romanian
-              ? "Unele zboruri salvate nu pot fi afișate."
-              : "Some saved flights could not be displayed.",
-          );
-        } else {
-          setLoadError("");
-        }
-        setPlans(validPlans);
-      } catch (error) {
-        console.error("Could not read saved flight plans.", error);
-        setLoadError(
-          romanian
-            ? "Zborurile salvate nu au putut fi încărcate."
-            : "Saved flights could not be loaded.",
-        );
-        setPlans([]);
-      }
-    }
-
-    loadPlans();
-    window.addEventListener("aerio:plans-updated", loadPlans);
-    window.addEventListener("storage", loadPlans);
-    return () => {
-      window.removeEventListener("aerio:plans-updated", loadPlans);
-      window.removeEventListener("storage", loadPlans);
-    };
-  }, [romanian]);
+  const utils = api.useUtils();
+  const plansQuery = api.flight.list.useQuery();
+  const updateStatus = api.flight.updateStatus.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.flight.list.invalidate(),
+        utils.flight.candidateTimes.invalidate(),
+      ]);
+    },
+  });
+  const plans = plansQuery.data ?? [];
+  const loadError =
+    plansQuery.error?.message ?? updateStatus.error?.message ?? "";
 
   function updatePlan(id: string, status: PlanStatus) {
-    try {
-      const next = plans.map((plan) =>
-        plan.id === id ? { ...plan, status } : plan,
-      );
-      localStorage.setItem(PLANS_KEY, JSON.stringify(next));
-      if (status === "approved") {
-        const plan = next.find((item) => item.id === id);
-        const storedApproved = localStorage.getItem(APPROVED_KEY);
-        const parsedApproved: unknown = storedApproved
-          ? JSON.parse(storedApproved)
-          : [];
-        if (!Array.isArray(parsedApproved)) {
-          throw new Error("Saved approved plans must be a list.");
-        }
-        const approvedEntries: unknown[] = parsedApproved;
-        const approved = approvedEntries.filter(
-          (item): item is { id: string } =>
-            typeof item === "object" &&
-            item !== null &&
-            "id" in item &&
-            typeof item.id === "string",
-        );
-        if (approved.length !== approvedEntries.length) {
-          throw new Error("Saved approved plans contain invalid data.");
-        }
-        if (plan && !approved.some((item) => item.id === id)) {
-          localStorage.setItem(
-            APPROVED_KEY,
-            JSON.stringify([...approved, { id, area: plan.area }]),
-          );
-        }
-      }
-      setPlans(next);
-      setLoadError("");
-      window.dispatchEvent(new Event("aerio:plans-updated"));
-    } catch (error) {
-      console.error("Could not update the saved flight status.", error);
-      setLoadError(
-        romanian
-          ? "Statusul zborului nu a putut fi salvat."
-          : "The flight status could not be saved.",
-      );
-    }
+    updateStatus.mutate({ id, status });
   }
 
   async function downloadAnexa1(plan: LocalPlan) {
@@ -389,15 +196,15 @@ export function MyFlights() {
     <>
       <p className="route-description">
         {romanian
-          ? "Toate cererile salvate pe acest dispozitiv, împreună cu statusul și documentele lor."
-          : "All requests saved on this device, with their status and documents."}
+          ? "Toate cererile salvate în cont, împreună cu statusul și documentele lor."
+          : "All requests saved to your account, with their status and document records."}
       </p>
       <section className="content-card flights-page">
         <div className="section-heading">
           <span className="eyebrow">
             {romanian
-              ? "PLANURI SALVATE · ACEST DISPOZITIV"
-              : "SAVED PLANS · THIS DEVICE"}
+              ? "PLANURI SALVATE · CONTUL MEU"
+              : "SAVED PLANS · MY ACCOUNT"}
           </span>
           <h2>{romanian ? "Zborurile mele" : "My flights"}</h2>
         </div>
@@ -409,6 +216,11 @@ export function MyFlights() {
         {loadError && (
           <p className="notice notice-warning" role="alert">
             {loadError}
+          </p>
+        )}
+        {plansQuery.isPending && (
+          <p className="muted" role="status">
+            {romanian ? "Se încarcă zborurile…" : "Loading saved flights…"}
           </p>
         )}
         {plans.length === 0 ? (
@@ -446,6 +258,14 @@ export function MyFlights() {
                           ? "Aprobare înregistrată local"
                           : "Approval recorded locally"}
                   </span>
+                  {plan.documents.length > 0 && (
+                    <span className="field-hint">
+                      {romanian ? "Documente pregătite:" : "Document records:"}{" "}
+                      {plan.documents
+                        .map((document) => document.fileName)
+                        .join(", ")}
+                    </span>
+                  )}
                 </div>
                 <div className="plan-actions">
                   <button
@@ -518,8 +338,8 @@ export function MyFlights() {
                 {plan.ctrIndicator && (
                   <p className="small-note">
                     {romanian
-                      ? "Datele rămân în acest browser. PDF-ul este o copie de lucru, nu este trimis automat și nu reprezintă o aprobare; verifică-l, semnează-l și confirmă cerințele oficiale."
-                      : "Your data stays in this browser. The PDF is a working copy, is not submitted automatically, and is not an approval; review and sign it, then confirm official requirements."}
+                      ? "Detaliile zborului sunt salvate în cont; fișierul PDF este generat la descărcare și nu este transmis automat sau considerat aprobare. Verifică-l și confirmă cerințele oficiale."
+                      : "Flight details are saved to your account; the PDF is generated when downloaded and is not submitted automatically or treated as an approval. Review it and confirm official requirements."}
                   </p>
                 )}
               </article>
@@ -528,8 +348,8 @@ export function MyFlights() {
         )}
         <p className="small-note">
           {romanian
-            ? "„Marchează trimis” și „Înregistrează aprobarea” actualizează doar acest browser. Aerio nu trimite emailuri și nu verifică aprobări."
-            : "“Mark sent” and “Record authority approval” only update this browser. Aerio does not send emails or verify approvals."}
+            ? "„Marchează trimis” și „Înregistrează aprobarea” salvează statusul în cont, dar nu transmit emailuri și nu verifică aprobări oficiale."
+            : "“Mark sent” and “Record authority approval” save status to your account, but do not send email or verify official approvals."}
         </p>
       </section>
     </>

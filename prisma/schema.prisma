@@ -1,25 +1,109 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  output   = "../generated/account-prisma"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  profile      PilotProfile?
+  sessions     Session[]
+  flightPlans  FlightPlan[]
+}
+
+model Session {
+  tokenHash String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PilotProfile {
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  firstName      String  @default("")
+  lastName       String  @default("")
+  email          String  @default("")
+  phone          String  @default("")
+  operatorId     String  @default("")
+  location       String  @default("")
+  registration   String  @default("")
+  insuranceUntil String  @default("")
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drones         Drone[]
+}
+
+model Drone {
+  id               String       @id
+  profileId        String
+  nickname         String
+  model            String
+  massGrams        Float
+  droneClass       String
+  cameraModel      String
+  cameraResolution String
+  profile          PilotProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  flightPlans      FlightPlan[]
+
+  @@index([profileId])
+}
+
 model FlightPlan {
-  id         String   @id @default(cuid())
-  flightDate String
-  startTime  String
-  endTime    String
-  area       String
-  drone      String
-  purpose    String
-  createdAt  DateTime @default(now())
+  id               String           @id @default(cuid())
+  userId           String
+  flightDate       String
+  startTime        String
+  endTime          String
+  area             String
+  drone            String
+  droneId          String?
+  purpose          String
+  pilot            String           @default("")
+  email            String           @default("")
+  phone            String           @default("")
+  operatorId       String           @default("")
+  location         String           @default("")
+  registration     String           @default("")
+  insuranceUntil   String           @default("")
+  contacts         String           @default("[]")
+  droneMassGrams   Float?
+  droneClass       String?
+  tower            String?
+  flightCategory   String?
+  operationMode    String?
+  maxAltitude      String?
+  signatureDataUrl String?
+  ctrIndicator     Boolean          @default(false)
+  status           String           @default("prepared")
+  createdAt        DateTime         @default(now())
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  selectedDrone    Drone?           @relation(fields: [droneId], references: [id], onDelete: SetNull)
+  documents        FlightDocument[]
 
   @@index([flightDate])
+  @@index([userId, flightDate])
+}
+
+model FlightDocument {
+  id           String     @id @default(cuid())
+  flightPlanId String
+  documentType String
+  fileName     String
+  mimeType     String
+  createdAt    DateTime   @default(now())
+  flightPlan   FlightPlan @relation(fields: [flightPlanId], references: [id], onDelete: Cascade)
+
+  @@index([flightPlanId])
 }

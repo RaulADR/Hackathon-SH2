@@ -380,7 +380,7 @@ html[data-theme="light"] .nav-link.active {
   font-weight: 750;
   letter-spacing: -0.04em;
 }
-.demo-session-indicator {
+.account-session-indicator {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -390,27 +390,27 @@ html[data-theme="light"] .nav-link.active {
   background: transparent;
   padding: 4px 6px;
 }
-.demo-session-dot {
+.account-session-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--green);
 }
-.demo-session-indicator > span:nth-child(2) {
+.account-session-indicator > span:nth-child(2) {
   display: grid;
   min-width: 0;
   gap: 2px;
 }
-.demo-session-indicator strong {
+.account-session-indicator strong {
   font-size: 10px;
 }
-.demo-session-indicator small {
+.account-session-indicator small {
   overflow: hidden;
   color: var(--muted);
   font-size: 9px;
   text-overflow: ellipsis;
 }
-.demo-session-indicator button {
+.account-session-indicator button {
   min-height: 26px;
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -2196,7 +2196,7 @@ html[data-theme="light"] .home-facts {
   .sidebar {
     padding: 7px;
   }
-  .demo-session-indicator {
+  .account-session-indicator {
     display: none;
   }
   .map-layout {
@@ -2243,7 +2243,7 @@ html[data-theme="light"] .home-facts {
   }
   .brand-text small,
   .sidebar-note,
-  .demo-session-indicator,
+  .account-session-indicator,
   .profile-link {
     display: none;
   }

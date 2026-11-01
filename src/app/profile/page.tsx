@@ -12,6 +12,7 @@ import {
   type DroneClass,
   type PilotDrone,
 } from "~/lib/drone";
+import { api } from "~/trpc/react";
 
 type PilotProfile = {
   firstName: string;
@@ -57,57 +58,59 @@ export default function ProfilePage() {
   });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const utils = api.useUtils();
+  const profileQuery = api.account.profile.useQuery();
+  const saveProfileMutation = api.account.saveProfile.useMutation();
 
   useEffect(() => {
-    try {
-      const savedProfile = localStorage.getItem("aerio.profile");
-      if (!savedProfile) {
-        setAddingDrone(true);
-        return;
-      }
-      const parsed = JSON.parse(savedProfile) as Partial<PilotProfile> & {
-        name?: string;
-        signatureDataUrl?: string;
-      };
-      delete parsed.signatureDataUrl;
-      const [legacyFirst = "", ...legacyLast] = (parsed.name ?? "")
-        .trim()
-        .split(/\s+/);
-      const drones = normalizeDrones(parsed.drones);
+    if (profileQuery.isSuccess) {
+      const savedProfile = profileQuery.data;
+      const drones = normalizeDrones(savedProfile?.drones);
       setProfile({
         ...emptyProfile,
-        ...parsed,
-        firstName: parsed.firstName?.trim() ? parsed.firstName : legacyFirst,
-        lastName: parsed.lastName?.trim()
-          ? parsed.lastName
-          : legacyLast.join(" "),
+        ...savedProfile,
+        email: savedProfile?.email ?? "",
         drones,
       });
       setAddingDrone(drones.length === 0);
-    } catch (loadError) {
-      console.error(
-        "Could not load the locally saved pilot profile.",
-        loadError,
-      );
-      setError("The saved profile could not be read.");
     }
-  }, []);
+  }, [profileQuery.data, profileQuery.isSuccess]);
 
-  function persistProfile(nextProfile: PilotProfile): boolean {
+  useEffect(() => {
+    if (profileQuery.error) {
+      console.error(
+        "Could not load the account pilot profile.",
+        profileQuery.error,
+      );
+      setError(
+        romanian
+          ? "Profilul nu a putut fi încărcat."
+          : "The account profile could not be loaded.",
+      );
+    }
+  }, [profileQuery.error, romanian]);
+
+  async function persistProfile(nextProfile: PilotProfile): Promise<boolean> {
     setError("");
     try {
-      localStorage.setItem("aerio.profile", JSON.stringify(nextProfile));
+      await saveProfileMutation.mutateAsync(nextProfile);
+      await Promise.all([
+        utils.account.profile.invalidate(),
+        utils.auth.me.invalidate(),
+      ]);
       setProfile(nextProfile);
       window.dispatchEvent(new Event("aerio:profile-updated"));
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
       return true;
     } catch (saveError) {
-      console.error("Could not save the pilot profile locally.", saveError);
+      console.error("Could not save the account pilot profile.", saveError);
       setError(
-        romanian
-          ? "Datele nu au putut fi salvate pe acest dispozitiv."
-          : "The details could not be saved on this device.",
+        saveError instanceof Error
+          ? saveError.message
+          : romanian
+            ? "Datele nu au putut fi salvate în cont."
+            : "The details could not be saved to your account.",
       );
       return false;
     }
@@ -115,10 +118,10 @@ export default function ProfilePage() {
 
   function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    persistProfile(profile);
+    void persistProfile(profile);
   }
 
-  function addDrone(event: React.FormEvent<HTMLFormElement>) {
+  async function addDrone(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const massGrams = Number(droneForm.massGrams);
     if (
@@ -158,7 +161,7 @@ export default function ProfilePage() {
           item.id === editingDroneId ? drone : item,
         )
       : [...profile.drones, drone];
-    if (persistProfile({ ...profile, drones })) {
+    if (await persistProfile({ ...profile, drones })) {
       setEditingDroneId(null);
       setDroneForm({
         presetId: "mini-4-pro",
@@ -245,9 +248,9 @@ export default function ProfilePage() {
     }));
   }
 
-  function removeDrone(id: string) {
+  async function removeDrone(id: string) {
     if (editingDroneId === id) cancelDroneForm();
-    persistProfile({
+    await persistProfile({
       ...profile,
       drones: profile.drones.filter((drone) => drone.id !== id),
     });
@@ -281,13 +284,13 @@ export default function ProfilePage() {
     <>
       <p className="route-description">
         {romanian
-          ? "Datele tale rămân pe acest dispozitiv și sunt folosite la pregătirea documentelor."
-          : "Your details stay on this device and are used to prepare request documents."}
+          ? "Profilul și flota sunt salvate în contul tău și pot fi folosite pentru pregătirea documentelor."
+          : "Your profile and fleet are saved to your account and used to prepare flight documents."}
       </p>
       <div className="notice notice-info prominent-notice">
         {romanian
-          ? "Acesta este doar un profil local, nu un cont AACR și nu înlocuiește înregistrarea oficială a operatorului sau dronei."
-          : "This is a local profile only; it is not an AACR account or a substitute for official drone/operator registration."}
+          ? "Profilul Aerio nu este un cont AACR și nu înlocuiește înregistrarea oficială a operatorului sau dronei."
+          : "An Aerio profile is not an AACR account or a substitute for official drone/operator registration."}
       </div>
       <section className="content-card profile-card">
         <div className="section-heading">
@@ -463,7 +466,10 @@ export default function ProfilePage() {
             : "Add as many drones as you need. Each one is saved automatically and can be selected individually in a flight request."}
         </p>
         {addingDrone && (
-          <form className="drone-editor" onSubmit={addDrone}>
+          <form
+            className="drone-editor"
+            onSubmit={(event) => void addDrone(event)}
+          >
             <div className="drone-editor-heading">
               <span className="drone-step">01</span>
               <div>
@@ -813,8 +819,8 @@ export default function ProfilePage() {
         )}
         <p className="small-note">
           {romanian
-            ? "Încadrarea este orientativă și nu înlocuiește eticheta clasei, regulile operaționale sau verificarea AACR/EASA. Flota este salvată automat local în acest browser."
-            : "This estimate does not replace the class label, operational rules, or AACR/EASA guidance. Your fleet is automatically saved in this browser."}
+            ? "Încadrarea este orientativă și nu înlocuiește eticheta clasei, regulile operaționale sau verificarea AACR/EASA. Flota este salvată în contul tău."
+            : "This estimate does not replace the class label, operational rules, or AACR/EASA guidance. Your fleet is saved to your account."}
         </p>
       </section>
     </>

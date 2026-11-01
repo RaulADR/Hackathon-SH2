@@ -3,6 +3,14 @@ import type { LatLngPoint } from "~/lib/geometry";
 
 export type PlanStatus = "prepared" | "sent" | "approved";
 
+export type FlightDocumentMetadata = {
+  id: string;
+  documentType: string;
+  fileName: string;
+  mimeType: string;
+  createdAt: Date;
+};
+
 export type LocalPlan = {
   id: string;
   flightDate: string;
@@ -28,4 +36,5 @@ export type LocalPlan = {
   signatureDataUrl?: string;
   ctrIndicator?: boolean;
   status: PlanStatus;
+  documents: FlightDocumentMetadata[];
 };
